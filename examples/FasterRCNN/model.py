@@ -8,7 +8,8 @@ from tensorpack.tfutils import get_current_tower_context
 from tensorpack.tfutils.summary import add_moving_summary
 from tensorpack.tfutils.argscope import argscope
 from tensorpack.tfutils.scope_utils import under_name_scope
-from tensorpack.models import Conv2D, FullyConnected, GlobalAvgPooling
+from tensorpack.models import (
+    Conv2D, FullyConnected, GlobalAvgPooling, Deconv2D)
 
 from utils.box_ops import pairwise_iou
 import config
@@ -448,3 +449,25 @@ def fastrcnn_losses(labels, boxes, label_logits, box_logits):
     for k in [label_loss, box_loss, accuracy, fg_accuracy, false_negative]:
         add_moving_summary(k)
     return label_loss, box_loss
+
+
+def maskrcnn_head(feature, num_class):
+    """
+    Args:
+        feature (NxCx7x7):
+        num_classes(int): num_category + 1
+
+    Returns:
+        mask_logits (N x num_category x 14 x 14):
+    """
+    with tf.variable_scope('maskrcnn'):
+        l = Deconv2D('deconv', feature, 256, 2, stride=2, nl=tf.nn.relu,
+                     W_init=tf.random_normal_initializer(stddev=0.001))
+        l = Conv2D('conv', l, num_class - 1, 1,
+                   W_init=tf.random_normal_initializer(stddev=0.001))
+        return l
+
+
+@under_name_scope()
+def maskrcnn_loss():
+    pass
