@@ -91,8 +91,6 @@ class Model(ModelDesc):
         anchor_boxes_encoded = encode_bbox_target(anchor_boxes, fm_anchors)
         featuremap = pretrained_resnet_conv4(image, config.RESNET_NUM_BLOCK[:3])
         rpn_label_logits, rpn_box_logits = rpn_head('rpn', featuremap, 1024, config.NUM_ANCHOR)
-        rpn_label_loss, rpn_box_loss = rpn_losses(
-            anchor_labels, anchor_boxes_encoded, rpn_label_logits, rpn_box_logits)
 
         decoded_boxes = decode_bbox_target(rpn_box_logits, fm_anchors)  # (fHxfWxNA)x4, floatbox
         proposal_boxes, proposal_scores = generate_rpn_proposals(
@@ -100,10 +98,10 @@ class Model(ModelDesc):
             tf.reshape(rpn_label_logits, [-1]),
             tf.shape(image)[2:])
 
+        # sample proposal boxes in training
+        rcnn_sampled_boxes, rcnn_encoded_boxes, rcnn_labels, fg_target_masks = sample_fast_rcnn_targets(
+            proposal_boxes, gt_boxes, gt_labels, gt_masks)
         if is_training:
-            # sample proposal boxes in training
-            rcnn_sampled_boxes, rcnn_encoded_boxes, rcnn_labels, fg_target_masks = sample_fast_rcnn_targets(
-                proposal_boxes, gt_boxes, gt_labels, gt_masks)
             boxes_on_featuremap = rcnn_sampled_boxes * (1.0 / config.ANCHOR_STRIDE)
         else:
             # use all proposal boxes in inference
@@ -114,13 +112,18 @@ class Model(ModelDesc):
         fastrcnn_label_logits, fastrcnn_box_logits = fastrcnn_head('fastrcnn', feature_fastrcnn, config.NUM_CLASS)
 
         if is_training:
+            # rpn
+            rpn_label_loss, rpn_box_loss = rpn_losses(
+                anchor_labels, anchor_boxes_encoded, rpn_label_logits, rpn_box_logits)
+
+            # fastrcnn
             fastrcnn_label_loss, fastrcnn_box_loss = fastrcnn_losses(
                 rcnn_labels, rcnn_encoded_boxes, fastrcnn_label_logits, fastrcnn_box_logits)
 
+            # maskrcnn
             fg_ind = tf.reshape(tf.where(rcnn_labels > 0), [-1])    # nfg, index into sampled rois
             fg_labels = tf.gather(rcnn_labels, fg_ind)
             fg_feature = tf.gather(feature_fastrcnn, fg_ind)
-
             mask_logits = maskrcnn_head('maskrcnn', fg_feature, config.NUM_CLASS)   # #fg x #cat x 14x14
             mrcnn_loss = maskrcnn_loss(mask_logits, fg_labels, fg_target_masks)
 
@@ -165,13 +168,15 @@ def visualize(model_path, nr_visualize=50, output_dir='output'):
     pred = OfflinePredictor(PredictConfig(
         model=Model(),
         session_init=get_model_loader(model_path),
-        input_names=['image', 'gt_boxes', 'gt_labels'],
+        input_names=['image', 'gt_boxes', 'gt_labels', 'gt_masks'],
         output_names=[
             'generate_rpn_proposals/boxes',
             'generate_rpn_proposals/probs',
             'fastrcnn_all_probs',
             'fastrcnn_fg_probs',
             'fastrcnn_fg_boxes',
+            'sample_fast_rcnn_targets/sampled_fg_boxes',
+            'sample_fast_rcnn_targets/sampled_fg_mask_targets',
         ]))
     df = get_train_dataflow(add_mask=True)
     df.reset_state()
@@ -181,9 +186,20 @@ def visualize(model_path, nr_visualize=50, output_dir='output'):
     utils.fs.mkdir_p(output_dir)
     with tqdm.tqdm(total=nr_visualize) as pbar:
         for idx, dp in itertools.islice(enumerate(df.get_data()), nr_visualize):
-            img, _, _, gt_boxes, gt_labels = dp
+            img, _, _, gt_boxes, gt_labels, gt_masks = dp
 
-            rpn_boxes, rpn_scores, all_probs, fg_probs, fg_boxes = pred(img, gt_boxes, gt_labels)
+            rpn_boxes, rpn_scores, all_probs, fg_probs, fg_boxes, \
+                sampled_fg_boxes, sampled_fg_mask_targets = pred(img, gt_boxes, gt_labels, gt_masks)
+            # from tensorpack.dataflow.imgaug import ResizeShortestEdge
+            # aug = ResizeShortestEdge(400)
+            # for fgbox, fgmask in zip(sampled_fg_boxes, sampled_fg_mask_targets):
+            #     fgbox = fgbox.astype('int32')
+            #     patch = img[fgbox[1]:fgbox[3], fgbox[0]:fgbox[2]]
+            #     patch = aug.augment(patch)
+            #     fgmask = cv2.resize(fgmask * 255, patch.shape[:2][::-1])
+
+            #     viz = tpviz.stack_patches([patch, fgmask], 1, 2, pad=True)
+            #     tpviz.interactive_imshow(viz)
 
             gt_viz = draw_annotation(img, gt_boxes, gt_labels)
             proposal_viz, good_proposals_ind = draw_proposal_recall(img, rpn_boxes, rpn_scores, gt_boxes)
@@ -274,6 +290,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.datadir:
         config.BASEDIR = args.datadir
+
+    from IPython import embed
+    import traceback
+    def excepthook(type, value, tb):
+        traceback.print_tb(tb)
+        embed()
+    sys.excepthook = excepthook
 
     if args.gpu:
         os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu

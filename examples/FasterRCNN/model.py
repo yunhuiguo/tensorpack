@@ -290,14 +290,16 @@ def sample_fast_rcnn_targets(boxes, gt_boxes, gt_labels, gt_masks=None):
     ret = [ret_boxes, tf.stop_gradient(ret_encoded_boxes), tf.stop_gradient(ret_labels)]
 
     if gt_masks is not None:
-        gt_masks_for_fg = tf.gather(gt_masks, fg_inds)  # nfg x H x W
-        fg_ret_boxes = tf.gather(boxes, fg_inds)    # nfg x 4
+        gt_masks_for_fg = tf.gather(
+            gt_masks,
+            tf.gather(best_iou_ind, fg_inds))  # nfg x H x W
+        fg_ret_boxes = tf.gather(boxes, fg_inds, name='sampled_fg_boxes')    # nfg x 4
         target_masks_for_fg = crop_and_resize(
             tf.expand_dims(gt_masks_for_fg, 1),
             fg_ret_boxes,
             tf.range(num_fg),
             14)  # nfg x 1x14x14
-        target_masks_for_fg = tf.squeeze(target_masks_for_fg, 1)
+        target_masks_for_fg = tf.squeeze(target_masks_for_fg, 1, 'sampled_fg_mask_targets')
         ret.append(tf.stop_gradient(target_masks_for_fg))
     return ret
 
@@ -485,8 +487,11 @@ def maskrcnn_loss(mask_logits, fg_labels, fg_target_masks):
     num_fg = tf.shape(fg_labels)[0]
     indices = tf.stack([tf.range(num_fg), tf.to_int32(fg_labels) - 1], axis=1)  # #fgx2
     mask_logits = tf.gather_nd(mask_logits, indices)  # #fgx14x14
+
     loss = tf.nn.sigmoid_cross_entropy_with_logits(
         labels=fg_target_masks, logits=mask_logits)
     loss = tf.reduce_mean(loss, name='maskrcnn_loss')
-    add_moving_summary(loss)
+    accuracy = tf.equal(tf.to_int32(mask_logits > 0.5), fg_target_masks)
+    accuracy = tf.reduce_mean(tf.to_float(accuracy), name='accuracy')
+    add_moving_summary(loss, accuracy)
     return loss
