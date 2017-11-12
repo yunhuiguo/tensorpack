@@ -230,17 +230,19 @@ def proposal_metrics(iou):
 
 
 @under_name_scope()
-def sample_fast_rcnn_targets(boxes, gt_boxes, gt_labels):
+def sample_fast_rcnn_targets(boxes, gt_boxes, gt_labels, gt_masks=None):
     """
     Args:
         boxes: nx4 region proposals, floatbox
         gt_boxes: mx4, floatbox
         gt_labels: m, int32
+        gt_masks: mxHxW, uint8
 
     Returns:
         sampled_boxes: tx4 floatbox, the rois
         target_boxes: tx4 encoded box, the regression target
-        labels: t labels
+        labels: t labels. non-zero elements means fg
+        target_masks: #nfg x 1x14x14
     """
     iou = pairwise_iou(boxes, gt_boxes)     # nxm
     proposal_metrics(iou)
@@ -270,9 +272,9 @@ def sample_fast_rcnn_targets(boxes, gt_boxes, gt_labels):
         bg_inds = tf.random_shuffle(bg_inds)[:num_bg]
 
         add_moving_summary(num_fg, num_bg)
-        return fg_inds, bg_inds
+        return fg_inds, bg_inds, num_fg
 
-    fg_inds, bg_inds = sample_fg_bg(iou)
+    fg_inds, bg_inds, num_fg = sample_fg_bg(iou)
 
     all_indices = tf.concat([fg_inds, bg_inds], axis=0)   # ind in all n+m boxes
     ret_boxes = tf.gather(boxes, all_indices, name='sampled_boxes')
@@ -284,19 +286,33 @@ def sample_fast_rcnn_targets(boxes, gt_boxes, gt_labels):
     ret_labels = tf.concat(
         [tf.gather(best_gt_labels, fg_inds),
          tf.zeros_like(bg_inds, dtype=tf.int64)], axis=0, name='sampled_labels')
-    return ret_boxes, tf.stop_gradient(ret_encoded_boxes), tf.stop_gradient(ret_labels)
+
+    ret = [ret_boxes, tf.stop_gradient(ret_encoded_boxes), tf.stop_gradient(ret_labels)]
+
+    if gt_masks is not None:
+        gt_masks_for_fg = tf.gather(gt_masks, fg_inds)  # nfg x H x W
+        fg_ret_boxes = tf.gather(boxes, fg_inds)    # nfg x 4
+        target_masks_for_fg = crop_and_resize(
+            tf.expand_dims(gt_masks_for_fg, 1),
+            fg_ret_boxes,
+            tf.range(num_fg),
+            14)  # nfg x 1x14x14
+        target_masks_for_fg = tf.squeeze(target_masks_for_fg, 1)
+        ret.append(tf.stop_gradient(target_masks_for_fg))
+    return ret
 
 
 @under_name_scope()
-def crop_and_resize(image, boxes, size):
+def crop_and_resize(image, boxes, box_ind, crop_size):
     """
     Better-aligned version of tf.image.crop_and_resize,
     following our definition of floating point boxes.
 
     Args:
-        image: 1CHW
+        image: NCHW
         boxes: nx4, x1y1x2y2
-        size (int):
+        box_ind: (n,)
+        crop_size (int):
 
     Returns:
         n,C,size,size
@@ -333,12 +349,11 @@ def crop_and_resize(image, boxes, size):
         return tf.concat([ny0, nx0, ny0 + nh, nx0 + nw], axis=1)
 
     image_shape = tf.shape(image)[2:]
-    boxes = transform_fpcoor_for_tf(boxes, image_shape, [size, size])
+    boxes = transform_fpcoor_for_tf(boxes, image_shape, [crop_size, crop_size])
     image = tf.transpose(image, [0, 2, 3, 1])   # 1hwc
     ret = tf.image.crop_and_resize(
-        image, boxes,
-        tf.zeros([tf.shape(boxes)[0]], dtype=tf.int32),
-        crop_size=[size, size])
+        image, boxes, box_ind,
+        crop_size=[crop_size, crop_size])
     ret = tf.transpose(ret, [0, 3, 1, 2])   # ncss
     return ret
 
@@ -354,12 +369,12 @@ def roi_align(featuremap, boxes, output_shape):
     Returns:
         NxCxoHxoW
     """
-
-    image_shape = tf.shape(featuremap)[2:]
-
     boxes = tf.stop_gradient(boxes)  # TODO
     # sample 4 locations per roi bin
-    ret = crop_and_resize(featuremap, boxes, output_shape * 2)
+    ret = crop_and_resize(
+        featuremap, boxes,
+        tf.zeros([tf.shape(boxes)[0]], dtype=tf.int32),
+        output_shape * 2)
     ret = tf.nn.avg_pool(ret, [1, 1, 2, 2], [1, 1, 2, 2], padding='SAME', data_format='NCHW')
     return ret
 
@@ -442,6 +457,7 @@ def fastrcnn_losses(labels, boxes, label_logits, box_logits):
     return label_loss, box_loss
 
 
+@layer_register(log_shape=True)
 def maskrcnn_head(feature, num_class):
     """
     Args:
@@ -451,14 +467,26 @@ def maskrcnn_head(feature, num_class):
     Returns:
         mask_logits (N x num_category x 14 x 14):
     """
-    with tf.variable_scope('maskrcnn'):
-        l = Deconv2D('deconv', feature, 256, 2, stride=2, nl=tf.nn.relu,
-                     W_init=tf.random_normal_initializer(stddev=0.001))
-        l = Conv2D('conv', l, num_class - 1, 1,
-                   W_init=tf.random_normal_initializer(stddev=0.001))
-        return l
+    with argscope([Conv2D, Deconv2D], data_format='NCHW',
+                  W_init=tf.random_normal_initializer(stddev=0.001)):
+        l = Deconv2D('deconv', feature, 256, 2, stride=2, nl=tf.nn.relu)
+        l = Conv2D('conv', l, num_class - 1, 1)
+    return l
 
 
 @under_name_scope()
-def maskrcnn_loss():
-    pass
+def maskrcnn_loss(mask_logits, fg_labels, fg_target_masks):
+    """
+    Args:
+        mask_logits: #fg x #category x14x14
+        fg_labels: #fg, in 1~#class
+        fg_target_masks: #fgx14x14
+    """
+    num_fg = tf.shape(fg_labels)[0]
+    indices = tf.stack([tf.range(num_fg), tf.to_int32(fg_labels) - 1], axis=1)  # #fgx2
+    mask_logits = tf.gather_nd(mask_logits, indices)  # #fgx14x14
+    loss = tf.nn.sigmoid_cross_entropy_with_logits(
+        labels=fg_target_masks, logits=mask_logits)
+    loss = tf.reduce_mean(loss, name='maskrcnn_loss')
+    add_moving_summary(loss)
+    return loss
