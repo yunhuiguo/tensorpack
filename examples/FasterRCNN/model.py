@@ -9,21 +9,21 @@ from tensorpack.tfutils.summary import add_moving_summary
 from tensorpack.tfutils.argscope import argscope
 from tensorpack.tfutils.scope_utils import under_name_scope
 from tensorpack.models import (
-    Conv2D, FullyConnected, GlobalAvgPooling, Deconv2D)
+    Conv2D, FullyConnected, GlobalAvgPooling, layer_register, Deconv2D)
 
 from utils.box_ops import pairwise_iou
 import config
 
 
+@layer_register(log_shape=True)
 def rpn_head(featuremap, channel, num_anchors):
     """
     Returns:
         label_logits: fHxfWxNA
         box_logits: fHxfWxNAx4
     """
-    with tf.variable_scope('rpn'), \
-            argscope(Conv2D, data_format='NCHW',
-                     W_init=tf.random_normal_initializer(stddev=0.01)):
+    with argscope(Conv2D, data_format='NCHW',
+                  W_init=tf.random_normal_initializer(stddev=0.01)):
         hidden = Conv2D('conv0', featuremap, channel, 3, nl=tf.nn.relu)
 
         label_logits = Conv2D('class', hidden, num_anchors, 1)
@@ -97,12 +97,11 @@ def rpn_losses(anchor_labels, anchor_boxes, label_logits, box_logits):
 
 
 @under_name_scope()
-def decode_bbox_target(box_predictions, anchors, stride):
+def decode_bbox_target(box_predictions, anchors):
     """
     Args:
         box_predictions: fHxfWxNAx4, logits
         anchors: fHxfWxNAx4, floatbox
-        stride (int): the stride of the anchors
 
     Returns:
         box_decoded: (fHxfWxNA)x4, float32
@@ -117,7 +116,7 @@ def decode_bbox_target(box_predictions, anchors, stride):
     xaya = tf.to_float(anchors_x2y2 + anchors_x1y1) * 0.5
 
     wbhb = tf.exp(tf.minimum(
-        box_pred_twth, np.log(config.MAX_SIZE * 1.0 / stride))) * waha
+        box_pred_twth, config.BBOX_DECODE_CLIP)) * waha
     xbyb = box_pred_txty * waha + xaya
     x1y1 = xbyb - wbhb * 0.5
     x2y2 = xbyb + wbhb * 0.5
@@ -373,6 +372,7 @@ def roi_align(featuremap, boxes, output_shape):
     return ret
 
 
+@layer_register(log_shape=True)
 def fastrcnn_head(feature, num_classes):
     """
     Args:
@@ -383,15 +383,14 @@ def fastrcnn_head(feature, num_classes):
         cls_logits (Nxnum_class), reg_logits (Nx num_class-1 x 4)
     """
     feature = GlobalAvgPooling('gap', feature, data_format='NCHW')
-    with tf.variable_scope('fastrcnn'):
-        classification = FullyConnected(
-            'class', feature, num_classes,
-            W_init=tf.random_normal_initializer(stddev=0.01))
-        box_regression = FullyConnected(
-            'box', feature, (num_classes - 1) * 4,
-            W_init=tf.random_normal_initializer(stddev=0.001))
-        box_regression = tf.reshape(box_regression, (-1, num_classes - 1, 4))
-        return classification, box_regression
+    classification = FullyConnected(
+        'class', feature, num_classes,
+        W_init=tf.random_normal_initializer(stddev=0.01))
+    box_regression = FullyConnected(
+        'box', feature, (num_classes - 1) * 4,
+        W_init=tf.random_normal_initializer(stddev=0.001))
+    box_regression = tf.reshape(box_regression, (-1, num_classes - 1, 4))
+    return classification, box_regression
 
 
 @under_name_scope()
