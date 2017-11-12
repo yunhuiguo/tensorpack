@@ -291,12 +291,12 @@ if __name__ == '__main__':
     if args.datadir:
         config.BASEDIR = args.datadir
 
-    from IPython import embed
-    import traceback
-    def excepthook(type, value, tb):
-        traceback.print_tb(tb)
-        embed()
-    sys.excepthook = excepthook
+    # from IPython import embed
+    # import traceback
+    # def excepthook(type, value, tb):
+    #     traceback.print_tb(tb)
+    #     embed()
+    # sys.excepthook = excepthook
 
     if args.gpu:
         os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
@@ -338,7 +338,7 @@ if __name__ == '__main__':
                      (210000 * factor // stepnum, 1e-4)]),
                 HumanHyperParamSetter('learning_rate'),
                 EvalCallback(),
-                #GPUUtilizationTracker(),
+                GPUUtilizationTracker(),
             ],
             steps_per_epoch=stepnum,
             max_epoch=230000 * factor // stepnum,

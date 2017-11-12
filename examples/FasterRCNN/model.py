@@ -491,7 +491,7 @@ def maskrcnn_loss(mask_logits, fg_labels, fg_target_masks):
     loss = tf.nn.sigmoid_cross_entropy_with_logits(
         labels=fg_target_masks, logits=mask_logits)
     loss = tf.reduce_mean(loss, name='maskrcnn_loss')
-    accuracy = tf.equal(tf.to_int32(mask_logits > 0.5), fg_target_masks)
+    accuracy = tf.equal(tf.to_int32(mask_logits > 0.5), tf.to_int32(fg_target_masks > 0.5))
     accuracy = tf.reduce_mean(tf.to_float(accuracy), name='accuracy')
     add_moving_summary(loss, accuracy)
     return loss
