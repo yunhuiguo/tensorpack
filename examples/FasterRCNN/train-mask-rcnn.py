@@ -40,8 +40,8 @@ from viz import (
     draw_predictions, draw_final_outputs)
 from common import clip_boxes, CustomResize, print_config
 from eval import (
-    eval_on_dataflow, detect_one_image, print_evaluation_scores, get_tf_nms,
-    nms_fastrcnn_results)
+    eval_on_dataflow, detect_one_image, segment_one_image,
+    print_evaluation_scores, nms_fastrcnn_results)
 import config
 
 
@@ -150,6 +150,12 @@ class Model(ModelDesc):
             decoded_boxes = decode_bbox_target(fg_box_logits, fg_boxes)  # Nfx4, floatbox
             decoded_boxes = tf.identity(decoded_boxes, name='fastrcnn_fg_boxes')
 
+            roi_resized = roi_align(featuremap, decoded_boxes * (1.0 / config.ANCHOR_STRIDE))
+            feature_maskrcnn = resnet_conv5(roi_resized, config.RESNET_NUM_BLOCK[-1])
+            mask_logits = maskrcnn_head('maskrcnn', feature_maskrcnn, config.NUM_CLASS)   # #fg x #cat x 14x14
+            indices = tf.stack([tf.range(tf.size(fg_ind)), tf.to_int32(labels) - 1], axis=1)  # #fgx14x14
+            mask_prediction = tf.gather_nd(mask_logits, indices, name='mask_prediction')
+
     def _get_optimizer(self):
         lr = tf.get_variable('learning_rate', initializer=0.003, trainable=False)
         tf.summary.scalar('learning_rate', lr)
@@ -246,9 +252,27 @@ def predict(model_path, input_file):
         output_names=[
             'fastrcnn_fg_probs',
             'fastrcnn_fg_boxes',
+            'mask_prediction'
         ]))
     img = cv2.imread(input_file, cv2.IMREAD_COLOR)
     results = detect_one_image(img, pred)
+    final = draw_final_outputs(img, results)
+    viz = np.concatenate((img, final), axis=1)
+    tpviz.interactive_imshow(viz)
+
+
+def predict_mask(model_path, input_file):
+    pred = OfflinePredictor(PredictConfig(
+        model=Model(),
+        session_init=get_model_loader(model_path),
+        input_names=['image'],
+        output_names=[
+            'fastrcnn_fg_probs',
+            'fastrcnn_fg_boxes',
+            'mask_prediction'
+        ]))
+    img = cv2.imread(input_file, cv2.IMREAD_COLOR)
+    results = segment_one_image(img, pred)
     final = draw_final_outputs(img, results)
     viz = np.concatenate((img, final), axis=1)
     tpviz.interactive_imshow(viz)

@@ -53,7 +53,6 @@ def nms_fastrcnn_results(boxes, probs):
     C = probs.shape[1]
     boxes = boxes.copy()
 
-    boxes_per_class = {}
     nms_func = get_tf_nms(config.RESULTS_PER_IM, config.FASTRCNN_NMS_THRESH)
     ret = []
     for klass in range(1, C):
@@ -87,7 +86,7 @@ def detect_one_image(img, model_func):
 
     Args:
         img: an image
-        model_func: a callable from TF model, takes [image] and returns (probs, boxes)
+        model_func: a callable from TF model, takes image and returns (probs, boxes)
 
     Returns:
         [DetectionResult]
