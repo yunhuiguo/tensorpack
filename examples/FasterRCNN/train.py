@@ -27,10 +27,10 @@ from coco import COCODetection
 from basemodel import (
     image_preprocess, pretrained_resnet_conv4, resnet_conv5)
 from model import (
-    rpn_head, rpn_losses,
     decode_bbox_target, encode_bbox_target,
+    rpn_head, rpn_losses,
     generate_rpn_proposals, sample_fast_rcnn_targets,
-    roi_align, fastrcnn_head, fastrcnn_losses, fastrcnn_predict_boxes)
+    roi_align, fastrcnn_head, fastrcnn_losses, fastrcnn_predictions)
 from data import (
     get_train_dataflow, get_eval_dataflow,
     get_all_anchors)
@@ -39,8 +39,7 @@ from viz import (
     draw_predictions, draw_final_outputs)
 from common import clip_boxes, CustomResize, print_config
 from eval import (
-    eval_on_dataflow, detect_one_image, print_evaluation_scores,
-    nms_fastrcnn_results)
+    eval_on_dataflow, detect_one_image, print_evaluation_scores)
 import config
 
 
@@ -112,7 +111,7 @@ class Model(ModelDesc):
         fastrcnn_label_logits, fastrcnn_box_logits = fastrcnn_head('fastrcnn', feature_fastrcnn, config.NUM_CLASS)
 
         if is_training:
-            fg_inds_wrt_sample = tf.where(rcnn_labels > 0)[:, 0]   # fg inds w.r.t all samples
+            fg_inds_wrt_sample = tf.reshape(tf.where(rcnn_labels > 0), [-1])   # fg inds w.r.t all samples
             fg_sampled_boxes = tf.gather(rcnn_sampled_boxes, fg_inds_wrt_sample)
 
             matched_gt_boxes = tf.gather(gt_boxes, fg_inds_wrt_gt)
@@ -137,14 +136,17 @@ class Model(ModelDesc):
                 add_moving_summary(k)
         else:
             label_probs = tf.nn.softmax(fastrcnn_label_logits, name='fastrcnn_all_probs')  # #proposal x #Class
-            labels = tf.argmax(fastrcnn_label_logits, axis=1)
-            fg_ind, fg_box_logits = fastrcnn_predict_boxes(labels, fastrcnn_box_logits)
-            fg_label_probs = tf.gather(label_probs, fg_ind, name='fastrcnn_fg_probs')
-            fg_boxes = tf.gather(proposal_boxes, fg_ind)
+            anchors = tf.tile(tf.expand_dims(proposal_boxes, 1), [1, config.NUM_CLASS - 1, 1])   # #proposal x #Cat x 4
+            decoded_boxes = decode_bbox_target(
+                fastrcnn_box_logits /
+                tf.constant(config.FASTRCNN_BBOX_REG_WEIGHTS), anchors)
+            decoded_boxes = tf.identity(decoded_boxes, name='fastrcnn_all_boxes')
 
-            fg_box_logits = fg_box_logits / tf.constant(config.FASTRCNN_BBOX_REG_WEIGHTS)
-            decoded_boxes = decode_bbox_target(fg_box_logits, fg_boxes)  # #fgx4, floatbox
-            decoded_boxes = tf.identity(decoded_boxes, name='fastrcnn_fg_boxes')
+            # Nx2. Each index into (#proposal, #category)
+            pred_indices, final_probs = fastrcnn_predictions(decoded_boxes, label_probs)
+            final_probs = tf.identity(final_probs, 'final_probs')
+            final_boxes = tf.gather_nd(decoded_boxes, pred_indices, name='final_boxes')
+            final_labels = tf.add(pred_indices[:, 1], 1, name='final_labels')
 
     def _get_optimizer(self):
         lr = tf.get_variable('learning_rate', initializer=0.003, trainable=False)
@@ -169,8 +171,9 @@ def visualize(model_path, nr_visualize=50, output_dir='output'):
             'generate_rpn_proposals/boxes',
             'generate_rpn_proposals/probs',
             'fastrcnn_all_probs',
-            'fastrcnn_fg_probs',
-            'fastrcnn_fg_boxes',
+            'final_boxes',
+            'final_probs',
+            'final_labels',
         ]))
     df = get_train_dataflow()
     df.reset_state()
@@ -182,21 +185,22 @@ def visualize(model_path, nr_visualize=50, output_dir='output'):
         for idx, dp in itertools.islice(enumerate(df.get_data()), nr_visualize):
             img, _, _, gt_boxes, gt_labels = dp
 
-            rpn_boxes, rpn_scores, all_probs, fg_probs, fg_boxes = pred(img, gt_boxes, gt_labels)
+            rpn_boxes, rpn_scores, all_probs, \
+                final_boxes, final_probs, final_labels = pred(img, gt_boxes, gt_labels)
 
+            # draw groundtruth boxes
             gt_viz = draw_annotation(img, gt_boxes, gt_labels)
+            # draw best proposals for each groundtruth, to show recall
             proposal_viz, good_proposals_ind = draw_proposal_recall(img, rpn_boxes, rpn_scores, gt_boxes)
+            # draw the scores for the above proposals
             score_viz = draw_predictions(img, rpn_boxes[good_proposals_ind], all_probs[good_proposals_ind])
 
-            fg_boxes = clip_boxes(fg_boxes, img.shape[:2])
-            fg_viz = draw_predictions(img, fg_boxes, fg_probs)
-
-            results = nms_fastrcnn_results(fg_boxes, fg_probs)
+            results = [DetectionResult(*args) for args in zip(final_labels, final_boxes, final_probs)]
             final_viz = draw_final_outputs(img, results)
 
             viz = tpviz.stack_patches([
-                gt_viz, proposal_viz, score_viz,
-                fg_viz, final_viz], 2, 3)
+                gt_viz, proposal_viz,
+                score_viz, final_viz], 2, 2)
 
             if os.environ.get('DISPLAY', None):
                 tpviz.interactive_imshow(viz)
@@ -210,8 +214,9 @@ def offline_evaluate(model_path, output_file):
         session_init=get_model_loader(model_path),
         input_names=['image'],
         output_names=[
-            'fastrcnn_fg_probs',
-            'fastrcnn_fg_boxes',
+            'final_boxes',
+            'final_probs',
+            'final_labels',
         ]))
     df = get_eval_dataflow()
     df = PrefetchDataZMQ(df, 1)
@@ -227,8 +232,9 @@ def predict(model_path, input_file):
         session_init=get_model_loader(model_path),
         input_names=['image'],
         output_names=[
-            'fastrcnn_fg_probs',
-            'fastrcnn_fg_boxes',
+            'final_boxes',
+            'final_probs',
+            'final_labels',
         ]))
     img = cv2.imread(input_file, cv2.IMREAD_COLOR)
     results = detect_one_image(img, pred)
@@ -239,7 +245,11 @@ def predict(model_path, input_file):
 
 class EvalCallback(Callback):
     def _setup_graph(self):
-        self.pred = self.trainer.get_predictor(['image'], ['fastrcnn_fg_probs', 'fastrcnn_fg_boxes'])
+        self.pred = self.trainer.get_predictor(
+            ['image'],
+            ['final_boxes',
+             'final_probs',
+             'final_labels'])
         self.df = PrefetchDataZMQ(get_eval_dataflow(), 1)
 
     def _before_train(self):

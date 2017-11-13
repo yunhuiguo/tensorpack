@@ -68,16 +68,15 @@ def draw_final_outputs(img, results):
     Args:
         results: [DetectionResult]
     """
-    all_boxes = []
-    all_tags = []
-    for class_id, boxes, scores in results:
-        all_boxes.extend(boxes)
-        all_tags.extend(
-            ["{},{:.2f}".format(COCOMeta.class_names[class_id], sc) for sc in scores])
-    all_boxes = np.asarray(all_boxes)
-    if all_boxes.shape[0] == 0:
+    if len(results) == 0:
         return img
-    return viz.draw_boxes(img, all_boxes, all_tags)
+
+    tags = []
+    for label, _, score in results:
+        tags.append(
+            "{},{:.2f}".format(COCOMeta.class_names[label], score))
+    boxes = np.asarray([x.box for x in results])
+    return viz.draw_boxes(img, boxes, tags)
 
 
 def draw_mask(im, mask, alpha=0.5, color=None):
