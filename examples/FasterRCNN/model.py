@@ -290,13 +290,11 @@ def crop_and_resize(image, boxes, box_ind, crop_size):
     """
     Better-aligned version of tf.image.crop_and_resize,
     following our definition of floating point boxes.
-
     Args:
         image: NCHW
         boxes: nx4, x1y1x2y2
         box_ind: (n,)
         crop_size (int):
-
     Returns:
         n,C,size,size
     """
