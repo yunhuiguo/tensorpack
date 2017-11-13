@@ -30,7 +30,8 @@ from model import (
     rpn_head, rpn_losses,
     decode_bbox_target, encode_bbox_target,
     generate_rpn_proposals, sample_fast_rcnn_targets,
-    roi_align, fastrcnn_head, fastrcnn_losses, fastrcnn_predict_boxes,
+    roi_align, crop_and_resize,
+    fastrcnn_head, fastrcnn_losses, fastrcnn_predict_boxes,
     maskrcnn_head, maskrcnn_loss)
 from data import (
     get_train_dataflow, get_eval_dataflow,
@@ -99,8 +100,9 @@ class Model(ModelDesc):
             tf.shape(image)[2:])
 
         # sample proposal boxes in training
-        rcnn_sampled_boxes, rcnn_encoded_boxes, rcnn_labels, fg_target_masks = sample_fast_rcnn_targets(
-            proposal_boxes, gt_boxes, gt_labels, gt_masks)
+        # TODO put in training
+        rcnn_sampled_boxes, rcnn_labels, fg_inds_wrt_gt = sample_fast_rcnn_targets(
+            proposal_boxes, gt_boxes, gt_labels)
         if is_training:
             boxes_on_featuremap = rcnn_sampled_boxes * (1.0 / config.ANCHOR_STRIDE)
         else:
@@ -117,14 +119,31 @@ class Model(ModelDesc):
                 anchor_labels, anchor_boxes_encoded, rpn_label_logits, rpn_box_logits)
 
             # fastrcnn
+            fg_inds_wrt_sample = tf.where(rcnn_labels > 0)[:, 0]   # fg inds w.r.t all samples
+            fg_sampled_boxes = tf.gather(rcnn_sampled_boxes, fg_inds_wrt_sample)
+
+            matched_gt_boxes = tf.gather(gt_boxes, fg_inds_wrt_gt)
+            encoded_boxes = encode_bbox_target(
+                matched_gt_boxes,
+                fg_sampled_boxes) * tf.constant(config.FASTRCNN_BBOX_REG_WEIGHTS)
             fastrcnn_label_loss, fastrcnn_box_loss = fastrcnn_losses(
-                rcnn_labels, rcnn_encoded_boxes, fastrcnn_label_logits, fastrcnn_box_logits)
+                rcnn_labels, fastrcnn_label_logits,
+                encoded_boxes,
+                tf.gather(fastrcnn_box_logits, fg_inds_wrt_sample))
 
             # maskrcnn
-            fg_ind = tf.reshape(tf.where(rcnn_labels > 0), [-1])    # nfg, index into sampled rois
-            fg_labels = tf.gather(rcnn_labels, fg_ind)
-            fg_feature = tf.gather(feature_fastrcnn, fg_ind)
+            fg_labels = tf.gather(rcnn_labels, fg_inds_wrt_sample)
+            fg_feature = tf.gather(feature_fastrcnn, fg_inds_wrt_sample)
             mask_logits = maskrcnn_head('maskrcnn', fg_feature, config.NUM_CLASS)   # #fg x #cat x 14x14
+
+            gt_masks_for_fg = tf.gather(gt_masks, fg_inds_wrt_gt)  # nfg x H x W
+            target_masks_for_fg = crop_and_resize(
+                tf.expand_dims(gt_masks_for_fg, 1),
+                fg_sampled_boxes,
+                tf.range(tf.size(fg_inds_wrt_gt)),
+                14)  # nfg x 1x14x14
+            target_masks_for_fg = tf.squeeze(target_masks_for_fg, 1, 'sampled_fg_mask_targets')
+
             mrcnn_loss = maskrcnn_loss(mask_logits, fg_labels, fg_target_masks)
 
             wd_cost = regularize_cost(

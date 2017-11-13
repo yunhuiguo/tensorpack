@@ -39,7 +39,7 @@ from viz import (
     draw_predictions, draw_final_outputs)
 from common import clip_boxes, CustomResize, print_config
 from eval import (
-    eval_on_dataflow, detect_one_image, print_evaluation_scores, get_tf_nms,
+    eval_on_dataflow, detect_one_image, print_evaluation_scores,
     nms_fastrcnn_results)
 import config
 
@@ -57,7 +57,7 @@ class Model(ModelDesc):
             InputDesc(tf.int32, (None, None, config.NUM_ANCHOR), 'anchor_labels'),
             InputDesc(tf.float32, (None, None, config.NUM_ANCHOR, 4), 'anchor_boxes'),
             InputDesc(tf.float32, (None, 4), 'gt_boxes'),
-            InputDesc(tf.int64, (None,), 'gt_labels'),
+            InputDesc(tf.int64, (None,), 'gt_labels'),  # all > 0
         ]
 
     def _preprocess(self, image):
@@ -92,15 +92,15 @@ class Model(ModelDesc):
         rpn_label_loss, rpn_box_loss = rpn_losses(
             anchor_labels, anchor_boxes_encoded, rpn_label_logits, rpn_box_logits)
 
-        decoded_boxes = decode_bbox_target(rpn_box_logits, fm_anchors)  # (fHxfWxNA)x4, floatbox
+        decoded_boxes = decode_bbox_target(rpn_box_logits, fm_anchors)  # fHxfWxNAx4, floatbox
         proposal_boxes, proposal_scores = generate_rpn_proposals(
-            decoded_boxes,
+            tf.reshape(decoded_boxes, [-1, 4]),
             tf.reshape(rpn_label_logits, [-1]),
             tf.shape(image)[2:])
 
         if is_training:
             # sample proposal boxes in training
-            rcnn_sampled_boxes, rcnn_encoded_boxes, rcnn_labels = sample_fast_rcnn_targets(
+            rcnn_sampled_boxes, rcnn_labels, fg_inds_wrt_gt = sample_fast_rcnn_targets(
                 proposal_boxes, gt_boxes, gt_labels)
             boxes_on_featuremap = rcnn_sampled_boxes * (1.0 / config.ANCHOR_STRIDE)
         else:
@@ -112,8 +112,17 @@ class Model(ModelDesc):
         fastrcnn_label_logits, fastrcnn_box_logits = fastrcnn_head('fastrcnn', feature_fastrcnn, config.NUM_CLASS)
 
         if is_training:
+            fg_inds_wrt_sample = tf.where(rcnn_labels > 0)[:, 0]   # fg inds w.r.t all samples
+            fg_sampled_boxes = tf.gather(rcnn_sampled_boxes, fg_inds_wrt_sample)
+
+            matched_gt_boxes = tf.gather(gt_boxes, fg_inds_wrt_gt)
+            encoded_boxes = encode_bbox_target(
+                matched_gt_boxes,
+                fg_sampled_boxes) * tf.constant(config.FASTRCNN_BBOX_REG_WEIGHTS)
             fastrcnn_label_loss, fastrcnn_box_loss = fastrcnn_losses(
-                rcnn_labels, rcnn_encoded_boxes, fastrcnn_label_logits, fastrcnn_box_logits)
+                rcnn_labels, fastrcnn_label_logits,
+                encoded_boxes,
+                tf.gather(fastrcnn_box_logits, fg_inds_wrt_sample))
 
             wd_cost = regularize_cost(
                 '(?:group1|group2|group3|rpn|fastrcnn)/.*W',
@@ -127,14 +136,14 @@ class Model(ModelDesc):
             for k in self.cost, wd_cost:
                 add_moving_summary(k)
         else:
-            label_probs = tf.nn.softmax(fastrcnn_label_logits, name='fastrcnn_all_probs')  # NP,
+            label_probs = tf.nn.softmax(fastrcnn_label_logits, name='fastrcnn_all_probs')  # #proposal x #Class
             labels = tf.argmax(fastrcnn_label_logits, axis=1)
             fg_ind, fg_box_logits = fastrcnn_predict_boxes(labels, fastrcnn_box_logits)
             fg_label_probs = tf.gather(label_probs, fg_ind, name='fastrcnn_fg_probs')
             fg_boxes = tf.gather(proposal_boxes, fg_ind)
 
             fg_box_logits = fg_box_logits / tf.constant(config.FASTRCNN_BBOX_REG_WEIGHTS)
-            decoded_boxes = decode_bbox_target(fg_box_logits, fg_boxes)  # Nfx4, floatbox
+            decoded_boxes = decode_bbox_target(fg_box_logits, fg_boxes)  # #fgx4, floatbox
             decoded_boxes = tf.identity(decoded_boxes, name='fastrcnn_fg_boxes')
 
     def _get_optimizer(self):
