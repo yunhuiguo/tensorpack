@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 # File: model.py
 
-import numpy as np
 import tensorflow as tf
 from tensorpack.tfutils import get_current_tower_context
 from tensorpack.tfutils.summary import add_moving_summary
@@ -13,6 +12,19 @@ from tensorpack.models import (
 
 from utils.box_ops import pairwise_iou
 import config
+
+
+@under_name_scope()
+def clip_boxes(boxes, window, name=None):
+    """
+    Args:
+        boxes: nx4, xyxy
+        window: [h, w]
+    """
+    boxes = tf.maximum(boxes, 0.0)
+    m = tf.tile(tf.reverse(window, [0]), [2])    # (4,)
+    boxes = tf.minimum(boxes, tf.to_float(m), name=name)
+    return boxes
 
 
 @layer_register(log_shape=True)
@@ -172,13 +184,6 @@ def generate_rpn_proposals(boxes, scores, img_shape):
         PRE_NMS_TOPK = config.TEST_PRE_NMS_TOPK
         POST_NMS_TOPK = config.TEST_POST_NMS_TOPK
 
-    @under_name_scope()
-    def clip_boxes(boxes, window):
-        boxes = tf.maximum(boxes, 0.0)
-        m = tf.tile(tf.reverse(window, [0]), [2])    # (4,)
-        boxes = tf.minimum(boxes, tf.to_float(m))
-        return boxes
-
     topk = tf.minimum(PRE_NMS_TOPK, tf.size(scores))
     topk_scores, topk_indices = tf.nn.top_k(scores, k=topk, sorted=False)
     topk_boxes = tf.gather(boxes, topk_indices)
@@ -206,7 +211,6 @@ def generate_rpn_proposals(boxes, scores, img_shape):
         topk_valid_boxes,
         nms_indices, name='boxes')
     final_scores = tf.gather(topk_valid_scores, nms_indices, name='scores')
-    final_probs = tf.gather(topk_valid_scores, nms_indices, name='probs')
     return final_boxes, final_scores
 
 
@@ -437,7 +441,6 @@ def fastrcnn_predictions(boxes, probs):
     """
     assert boxes.shape[1] == config.NUM_CLASS - 1
     assert probs.shape[1] == config.NUM_CLASS
-    N = tf.shape(boxes)[0]
     boxes = tf.transpose(boxes, [1, 0, 2])  # #catxnx4
     probs = tf.transpose(probs[:, 1:], [1, 0])  # #catxn
 
