@@ -211,6 +211,7 @@ def generate_rpn_proposals(boxes, scores, img_shape):
         topk_valid_boxes,
         nms_indices, name='boxes')
     final_scores = tf.gather(topk_valid_scores, nms_indices, name='scores')
+    tf.sigmoid(final_scores, name='probs')
     return final_boxes, final_scores
 
 
@@ -514,11 +515,19 @@ def maskrcnn_loss(mask_logits, fg_labels, fg_target_masks):
     num_fg = tf.shape(fg_labels)[0]
     indices = tf.stack([tf.range(num_fg), tf.to_int32(fg_labels) - 1], axis=1)  # #fgx2
     mask_logits = tf.gather_nd(mask_logits, indices)  # #fgx14x14
+    mask_probs = tf.sigmoid(mask_logits)
+    with tf.name_scope('mask_viz'):
+        viz = tf.concat([fg_target_masks, mask_probs], axis=1)
+        viz = tf.expand_dims(viz, 3)
+        viz = tf.cast(viz * 255, tf.uint8)
+        tf.summary.image('mask_truth|pred', viz, max_outputs=10)
 
     loss = tf.nn.sigmoid_cross_entropy_with_logits(
         labels=fg_target_masks, logits=mask_logits)
     loss = tf.reduce_mean(loss, name='maskrcnn_loss')
-    accuracy = tf.equal(tf.to_int32(mask_logits > 0.5), tf.to_int32(fg_target_masks > 0.5))
+    accuracy = tf.equal(tf.to_int32(mask_probs > 0.5), tf.to_int32(fg_target_masks > 0.5))
     accuracy = tf.reduce_mean(tf.to_float(accuracy), name='accuracy')
-    add_moving_summary(loss, accuracy)
+
+    fg_pixel_ratio = tf.reduce_mean(tf.to_float32(fg_target_masks > 0.5), name='fg_pixel_ratio')
+    add_moving_summary(loss, accuracy, fg_pixel_ratio)
     return loss

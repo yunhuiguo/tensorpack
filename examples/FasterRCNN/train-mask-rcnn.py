@@ -25,7 +25,7 @@ from coco import COCODetection
 from basemodel import (
     image_preprocess, pretrained_resnet_conv4, resnet_conv5)
 from model import (
-    clip_boxes, decode_bbox_target, encode_bbox_target,
+    clip_boxes, decode_bbox_target, encode_bbox_target, crop_and_resize,
     rpn_head, rpn_losses,
     generate_rpn_proposals, sample_fast_rcnn_targets, roi_align,
     fastrcnn_head, fastrcnn_losses, fastrcnn_predictions,
@@ -83,6 +83,7 @@ class Model(ModelDesc):
     def _build_graph(self, inputs):
         is_training = get_current_tower_context().is_training
         image, anchor_labels, anchor_boxes, gt_boxes, gt_labels, gt_masks = inputs
+        image_shape2d = tf.shape(image)[:2]
         fm_anchors = self._get_anchors(image)
         image = self._preprocess(image)
 
@@ -94,7 +95,7 @@ class Model(ModelDesc):
         proposal_boxes, proposal_scores = generate_rpn_proposals(
             tf.reshape(decoded_boxes, [-1, 4]),
             tf.reshape(rpn_label_logits, [-1]),
-            tf.shape(image)[2:])
+            image_shape2d)
 
         # sample proposal boxes in training
         # TODO put in training
@@ -117,7 +118,7 @@ class Model(ModelDesc):
 
             # fastrcnn loss
             fg_inds_wrt_sample = tf.reshape(tf.where(rcnn_labels > 0), [-1])   # fg inds w.r.t all samples
-            fg_sampled_boxes = tf.gather(rcnn_sampled_boxes, fg_inds_wrt_sample)
+            fg_sampled_boxes = tf.gather(rcnn_sampled_boxes, fg_inds_wrt_sample, name='sampled_fg_boxes')
 
             matched_gt_boxes = tf.gather(gt_boxes, fg_inds_wrt_gt)
             encoded_boxes = encode_bbox_target(
@@ -132,6 +133,8 @@ class Model(ModelDesc):
             fg_labels = tf.gather(rcnn_labels, fg_inds_wrt_sample)
             fg_feature = tf.gather(feature_fastrcnn, fg_inds_wrt_sample)
             mask_logits = maskrcnn_head('maskrcnn', fg_feature, config.NUM_CLASS)   # #fg x #cat x 14x14
+            #inds = tf.stack([tf.range(tf.size(fg_labels)), tf.to_int32(fg_labels) - 1], axis=1)
+            #tf.sigmoid(tf.gather_nd(mask_logits, inds), name='predict_masks_training')
 
             gt_masks_for_fg = tf.gather(gt_masks, fg_inds_wrt_gt)  # nfg x H x W
             target_masks_for_fg = crop_and_resize(
@@ -141,7 +144,7 @@ class Model(ModelDesc):
                 14)  # nfg x 1x14x14
             target_masks_for_fg = tf.squeeze(target_masks_for_fg, 1, 'sampled_fg_mask_targets')
 
-            mrcnn_loss = maskrcnn_loss(mask_logits, fg_labels, fg_target_masks)
+            mrcnn_loss = maskrcnn_loss(mask_logits, fg_labels, target_masks_for_fg)
 
             wd_cost = regularize_cost(
                 '(?:group1|group2|group3|rpn|fastrcnn|maskrcnn)/.*W',
@@ -168,11 +171,12 @@ class Model(ModelDesc):
             final_boxes = tf.gather_nd(decoded_boxes, pred_indices, name='final_boxes')
             final_labels = tf.add(pred_indices[:, 1], 1, name='final_labels')
 
-            roi_resized = roi_align(featuremap, final_boxes * (1.0 / config.ANCHOR_STRIDE))
+            roi_resized = roi_align(featuremap, final_boxes * (1.0 / config.ANCHOR_STRIDE), 14)
             feature_maskrcnn = resnet_conv5(roi_resized, config.RESNET_NUM_BLOCK[-1])
             mask_logits = maskrcnn_head('maskrcnn', feature_maskrcnn, config.NUM_CLASS)   # #result x #cat x 14x14
             indices = tf.stack([tf.range(tf.size(final_labels)), tf.to_int32(final_labels) - 1], axis=1)
-            tf.gather_nd(mask_logits, indices, name='final_masks')   # #resultx14x14
+            final_mask_logits = tf.gather_nd(mask_logits, indices)   # #resultx14x14
+            tf.sigmoid(final_mask_logits, name='final_masks')
 
     def _get_optimizer(self):
         lr = tf.get_variable('learning_rate', initializer=0.003, trainable=False)
@@ -189,6 +193,9 @@ class Model(ModelDesc):
 
 
 def visualize(model_path, nr_visualize=50, output_dir='output'):
+    df = get_train_dataflow(add_mask=True)
+    df.reset_state()
+
     pred = OfflinePredictor(PredictConfig(
         model=Model(),
         session_init=get_model_loader(model_path),
@@ -196,13 +203,16 @@ def visualize(model_path, nr_visualize=50, output_dir='output'):
         output_names=[
             'generate_rpn_proposals/boxes',
             'generate_rpn_proposals/probs',
-            'fastrcnn_all_probs',
-            'final_boxes',
-            'final_probs',
-            'final_labels',
+            #'fastrcnn_all_probs',
+            #'final_boxes',
+            #'final_probs',
+            #'final_labels',
+
+            'sampled_fg_boxes',
+            'sampled_fg_mask_targets',
+            'predict_masks_training',
+            'maskrcnn_loss/print_acc'
         ]))
-    df = get_train_dataflow(add_mask=True)
-    df.reset_state()
 
     if os.path.isdir(output_dir):
         shutil.rmtree(output_dir)
@@ -211,19 +221,24 @@ def visualize(model_path, nr_visualize=50, output_dir='output'):
         for idx, dp in itertools.islice(enumerate(df.get_data()), nr_visualize):
             img, _, _, gt_boxes, gt_labels, gt_masks = dp
 
-            rpn_boxes, rpn_scores, all_probs, \
-                final_boxes, final_probs, final_labels = pred(img, gt_boxes, gt_labels)
+                # all_probs, final_boxes, final_probs, final_labels, \
+            rpn_boxes, rpn_scores, \
+                sampled_fg_boxes, sampled_fg_mask_targets, predict_masks, \
+                acc = pred(img, gt_boxes, gt_labels, gt_masks)
 
-            # from tensorpack.dataflow.imgaug import ResizeShortestEdge
-            # aug = ResizeShortestEdge(400)
-            # for fgbox, fgmask in zip(sampled_fg_boxes, sampled_fg_mask_targets):
-            #     fgbox = fgbox.astype('int32')
-            #     patch = img[fgbox[1]:fgbox[3], fgbox[0]:fgbox[2]]
-            #     patch = aug.augment(patch)
-            #     fgmask = cv2.resize(fgmask * 255, patch.shape[:2][::-1])
+            from tensorpack.dataflow.imgaug import ResizeShortestEdge
+            aug = ResizeShortestEdge(400)
+            for fgbox, fgmask, predmask in zip(sampled_fg_boxes, sampled_fg_mask_targets, predict_masks):
+                fgbox = fgbox.astype('int32')
+                patch = img[fgbox[1]:fgbox[3], fgbox[0]:fgbox[2]]
+                patch = aug.augment(patch)
 
-            #     viz = tpviz.stack_patches([patch, fgmask], 1, 2, pad=True)
-            #     tpviz.interactive_imshow(viz)
+                fgmask = cv2.resize(fgmask * 255, patch.shape[:2][::-1])
+                predmask = cv2.resize(predmask * 255, patch.shape[:2][::-1])
+
+                viz = tpviz.stack_patches([patch, fgmask, predmask], 1, 3, pad=True)
+                tpviz.interactive_imshow(viz)
+            import IPython as IP; IP.embed()
 
             # draw groundtruth boxes
             gt_viz = draw_annotation(img, gt_boxes, gt_labels)
@@ -327,6 +342,7 @@ if __name__ == '__main__':
                     'final_boxes',
                     'final_probs',
                     'final_labels',
+                    'final_masks',
                 ]))
             if args.evaluate:
                 assert args.evaluate.endswith('.json')
