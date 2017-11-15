@@ -3,6 +3,9 @@
 # File: config.py
 
 import numpy as np
+from collections import namedtuple
+
+MODE = namedtuple('Mode', ['mask'])(True)
 
 # dataset -----------------------
 BASEDIR = '/path/to/your/COCO/DIR'
