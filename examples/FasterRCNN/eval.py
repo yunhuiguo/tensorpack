@@ -44,11 +44,9 @@ def fill_full_mask(box, mask, shape):
     h = y1 + 1 - y0
 
     # rounding errors could happen here, masks were not originally computed from integer coords
-    import IPython as IP; IP.embed()
     mask = (cv2.resize(mask, (w, h)) > 0.5).astype('uint8')
     ret = np.zeros(shape, dtype='uint8')
     ret[y0:y1 + 1, x0:x1 + 1] = mask
-    import IPython as IP; IP.embed()
     return ret
 
 

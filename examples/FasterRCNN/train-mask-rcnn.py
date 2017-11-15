@@ -287,6 +287,7 @@ class EvalCallback(Callback):
         interval = self.trainer.max_epoch // (EVAL_TIMES + 1)
         self.epochs_to_eval = set([interval * k for k in range(1, EVAL_TIMES)])
         self.epochs_to_eval.add(self.trainer.max_epoch)
+        #self.epochs_to_eval.add(1)
 
     def _eval(self):
         all_results = eval_on_dataflow(self.df, lambda img: detect_one_image(img, self.pred))

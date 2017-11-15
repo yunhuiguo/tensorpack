@@ -254,7 +254,7 @@ def get_train_dataflow(add_mask=False):
         return ret
 
     ds = MapData(ds, preprocess)
-    ds = PrefetchDataZMQ(ds, 1)
+    # ds = PrefetchDataZMQ(ds, 1)
     return ds
 
 
