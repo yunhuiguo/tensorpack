@@ -280,7 +280,7 @@ class EvalCallback(Callback):
     def _setup_graph(self):
         self.pred = self.trainer.get_predictor(
             ['image'],
-            ['final_boxes', 'final_probs', 'final_labels'])
+            ['final_boxes', 'final_probs', 'final_labels', 'final_masks'])
         self.df = get_eval_dataflow()
 
     def _before_train(self):
