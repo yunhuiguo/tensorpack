@@ -528,6 +528,6 @@ def maskrcnn_loss(mask_logits, fg_labels, fg_target_masks):
     accuracy = tf.equal(tf.to_int32(mask_probs > 0.5), tf.to_int32(fg_target_masks > 0.5))
     accuracy = tf.reduce_mean(tf.to_float(accuracy), name='accuracy')
 
-    fg_pixel_ratio = tf.reduce_mean(tf.to_float32(fg_target_masks > 0.5), name='fg_pixel_ratio')
+    fg_pixel_ratio = tf.reduce_mean(tf.to_float(fg_target_masks > 0.5), name='fg_pixel_ratio')
     add_moving_summary(loss, accuracy, fg_pixel_ratio)
     return loss
