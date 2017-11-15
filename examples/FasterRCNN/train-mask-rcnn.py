@@ -238,7 +238,6 @@ def visualize(model_path, nr_visualize=50, output_dir='output'):
 
                 viz = tpviz.stack_patches([patch, fgmask, predmask], 1, 3, pad=True)
                 tpviz.interactive_imshow(viz)
-            import IPython as IP; IP.embed()
 
             # draw groundtruth boxes
             gt_viz = draw_annotation(img, gt_boxes, gt_labels)
