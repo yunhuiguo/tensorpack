@@ -499,7 +499,7 @@ def maskrcnn_head(feature, num_class):
     """
     with argscope([Conv2D, Deconv2D], data_format='NCHW',
                   W_init=tf.variance_scaling_initializer(
-                      factor=2.0, mode='fan_in', distribution='normal')):
+                      scale=2.0, mode='fan_in', distribution='normal')):
         l = Deconv2D('deconv', feature, 256, 2, stride=2, nl=tf.nn.relu)
         l = Conv2D('conv', l, num_class - 1, 1)
     return l
