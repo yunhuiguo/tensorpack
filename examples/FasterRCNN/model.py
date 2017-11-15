@@ -292,7 +292,7 @@ def sample_fast_rcnn_targets(boxes, gt_boxes, gt_labels):
         [tf.gather(gt_labels, fg_inds_wrt_gt),
          tf.zeros_like(bg_inds, dtype=tf.int64)], axis=0, name='sampled_labels')
 
-    return ret_boxes, tf.stop_gradient(ret_labels), fg_inds_wrt_gt
+    return tf.stop_gradient(ret_boxes), tf.stop_gradient(ret_labels), fg_inds_wrt_gt
 
 
 @under_name_scope()
@@ -498,7 +498,8 @@ def maskrcnn_head(feature, num_class):
         mask_logits (N x num_category x 14 x 14):
     """
     with argscope([Conv2D, Deconv2D], data_format='NCHW',
-                  W_init=tf.random_normal_initializer(stddev=0.001)):
+                  W_init=tf.variance_scaling_initializer(
+                      factor=2.0, mode='fan_in', distribution='normal')):
         l = Deconv2D('deconv', feature, 256, 2, stride=2, nl=tf.nn.relu)
         l = Conv2D('conv', l, num_class - 1, 1)
     return l
@@ -510,7 +511,7 @@ def maskrcnn_loss(mask_logits, fg_labels, fg_target_masks):
     Args:
         mask_logits: #fg x #category x14x14
         fg_labels: #fg, in 1~#class
-        fg_target_masks: #fgx14x14
+        fg_target_masks: #fgx14x14, int
     """
     num_fg = tf.shape(fg_labels)[0]
     indices = tf.stack([tf.range(num_fg), tf.to_int32(fg_labels) - 1], axis=1)  # #fgx2
@@ -525,9 +526,17 @@ def maskrcnn_loss(mask_logits, fg_labels, fg_target_masks):
     loss = tf.nn.sigmoid_cross_entropy_with_logits(
         labels=fg_target_masks, logits=mask_logits)
     loss = tf.reduce_mean(loss, name='maskrcnn_loss')
-    accuracy = tf.equal(tf.to_int32(mask_probs > 0.5), tf.to_int32(fg_target_masks > 0.5))
-    accuracy = tf.reduce_mean(tf.to_float(accuracy), name='accuracy')
 
-    fg_pixel_ratio = tf.reduce_mean(tf.to_float(fg_target_masks > 0.5), name='fg_pixel_ratio')
-    add_moving_summary(loss, accuracy, fg_pixel_ratio)
+    pred_label = mask_probs > 0.5
+    truth_label = fg_target_masks > 0.5
+    accuracy = tf.reduce_mean(
+        tf.to_float(tf.equal(pred_label, truth_label)),
+        name='accuracy')
+    pos_accuracy = tf.logical_and(
+        tf.equal(pred_label, truth_label),
+        tf.equal(truth_label, True))
+    pos_accuracy = tf.reduce_mean(tf.to_float(pos_accuracy), name='pos_accuracy')
+    fg_pixel_ratio = tf.reduce_mean(tf.to_float(truth_label), name='fg_pixel_ratio')
+
+    add_moving_summary(loss, accuracy, fg_pixel_ratio, pos_accuracy)
     return loss
