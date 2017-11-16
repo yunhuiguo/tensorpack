@@ -171,12 +171,17 @@ class Model(ModelDesc):
             final_boxes = tf.gather_nd(decoded_boxes, pred_indices, name='final_boxes')
             final_labels = tf.add(pred_indices[:, 1], 1, name='final_labels')
 
-            roi_resized = roi_align(featuremap, final_boxes * (1.0 / config.ANCHOR_STRIDE), 14)
-            feature_maskrcnn = resnet_conv5(roi_resized, config.RESNET_NUM_BLOCK[-1])
-            mask_logits = maskrcnn_head('maskrcnn', feature_maskrcnn, config.NUM_CLASS)   # #result x #cat x 14x14
-            indices = tf.stack([tf.range(tf.size(final_labels)), tf.to_int32(final_labels) - 1], axis=1)
-            final_mask_logits = tf.gather_nd(mask_logits, indices)   # #resultx14x14
-            tf.sigmoid(final_mask_logits, name='final_masks')
+            def f1():
+                # convolution doesn't take empty tensor
+                roi_resized = roi_align(featuremap, final_boxes * (1.0 / config.ANCHOR_STRIDE), 14)
+                feature_maskrcnn = resnet_conv5(roi_resized, config.RESNET_NUM_BLOCK[-1])
+                mask_logits = maskrcnn_head('maskrcnn', feature_maskrcnn, config.NUM_CLASS)   # #result x #cat x 14x14
+                indices = tf.stack([tf.range(tf.size(final_labels)), tf.to_int32(final_labels) - 1], axis=1)
+                final_mask_logits = tf.gather_nd(mask_logits, indices)   # #resultx14x14
+                return tf.sigmoid(final_mask_logits)
+
+            final_masks = tf.cond(tf.size(final_probs) > 0, f1, lambda: tf.zeros([0, 14, 14]))
+            tf.identity(final_masks, name='final_masks')
 
     def _get_optimizer(self):
         lr = tf.get_variable('learning_rate', initializer=0.003, trainable=False)
