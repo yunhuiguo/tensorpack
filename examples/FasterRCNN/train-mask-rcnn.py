@@ -133,8 +133,6 @@ class Model(ModelDesc):
             fg_labels = tf.gather(rcnn_labels, fg_inds_wrt_sample)
             fg_feature = tf.gather(feature_fastrcnn, fg_inds_wrt_sample)
             mask_logits = maskrcnn_head('maskrcnn', fg_feature, config.NUM_CLASS)   # #fg x #cat x 14x14
-            #inds = tf.stack([tf.range(tf.size(fg_labels)), tf.to_int32(fg_labels) - 1], axis=1)
-            #tf.sigmoid(tf.gather_nd(mask_logits, inds), name='predict_masks_training')
 
             gt_masks_for_fg = tf.gather(gt_masks, fg_inds_wrt_gt)  # nfg x H x W
             target_masks_for_fg = crop_and_resize(
@@ -204,7 +202,7 @@ def visualize(model_path, nr_visualize=50, output_dir='output'):
     pred = OfflinePredictor(PredictConfig(
         model=Model(),
         session_init=get_model_loader(model_path),
-        input_names=['image', 'gt_boxes', 'gt_labels', 'gt_masks'],
+        #input_names=['image', 'gt_boxes', 'gt_labels', 'gt_masks'],
         output_names=[
             'generate_rpn_proposals/boxes',
             'generate_rpn_proposals/probs',
@@ -214,9 +212,7 @@ def visualize(model_path, nr_visualize=50, output_dir='output'):
             #'final_labels',
 
             'sampled_fg_boxes',
-            'sampled_fg_mask_targets',
-            'predict_masks_training',
-            'maskrcnn_loss/print_acc'
+            'maskrcnn_loss/mask_viz/viz',
         ]))
 
     if os.path.isdir(output_dir):
@@ -228,20 +224,20 @@ def visualize(model_path, nr_visualize=50, output_dir='output'):
 
                 # all_probs, final_boxes, final_probs, final_labels, \
             rpn_boxes, rpn_scores, \
-                sampled_fg_boxes, sampled_fg_mask_targets, predict_masks, \
-                acc = pred(img, gt_boxes, gt_labels, gt_masks)
+                sampled_fg_boxes, predict_viz \
+                = pred(*dp)
 
             from tensorpack.dataflow.imgaug import ResizeShortestEdge
             aug = ResizeShortestEdge(400)
-            for fgbox, fgmask, predmask in zip(sampled_fg_boxes, sampled_fg_mask_targets, predict_masks):
+            for fgbox, viz in zip(sampled_fg_boxes, predict_viz):
                 fgbox = fgbox.astype('int32')
                 patch = img[fgbox[1]:fgbox[3], fgbox[0]:fgbox[2]]
                 patch = aug.augment(patch)
+                h, w = patch.shape[:2]
 
-                fgmask = cv2.resize(fgmask * 255, patch.shape[:2][::-1])
-                predmask = cv2.resize(predmask * 255, patch.shape[:2][::-1])
-
-                viz = tpviz.stack_patches([patch, fgmask, predmask], 1, 3, pad=True)
+                viz = cv2.resize(viz, (w, h * 2))
+                viz = tpviz.stack_patches([patch, viz],
+                    nr_row=2, nr_col=1, pad=True)
                 tpviz.interactive_imshow(viz)
 
             # draw groundtruth boxes

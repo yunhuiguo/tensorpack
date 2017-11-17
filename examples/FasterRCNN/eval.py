@@ -12,6 +12,7 @@ from tensorpack.utils.utils import get_tqdm_kwargs
 
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
+import pycocotools.mask as cocomask
 
 from coco import COCOMeta
 from common import CustomResize
@@ -63,6 +64,7 @@ def detect_one_image(img, model_func):
         [DetectionResult]
     """
 
+    orig_shape = img.shape[:2]
     resizer = CustomResize(config.SHORT_EDGE_SIZE, config.MAX_SIZE)
     resized_img = resizer.augment(img)
     scale = (resized_img.shape[0] * 1.0 / img.shape[0] + resized_img.shape[1] * 1.0 / img.shape[1]) / 2
@@ -71,7 +73,7 @@ def detect_one_image(img, model_func):
     ret[0] = ret[0] / scale
 
     if config.MODE.mask:
-        full_masks = [fill_full_mask(box, mask, img.shape[:2])
+        full_masks = [fill_full_mask(box, mask, orig_shape)
                       for box, mask in zip(ret[0], ret[3])]
         ret[3] = full_masks
 
@@ -98,11 +100,16 @@ def eval_on_dataflow(df, detect_func):
                 cat_id = COCOMeta.class_id_to_category_id[r.class_id]
                 box[2] -= box[0]
                 box[3] -= box[1]
+
+                mask = r.mask
+                rle = cocomask.encode(
+                    np.array(mask[:, :, None], order='F'))[0]
                 all_results.append({
                     'image_id': img_id,
                     'category_id': cat_id,
                     'bbox': list(map(lambda x: float(round(x, 1)), box)),
                     'score': float(round(r.score, 2)),
+                    'segmentation': rle
                 })
             pbar.update(1)
     return all_results
@@ -116,9 +123,13 @@ def print_evaluation_scores(json_file):
         'instances_{}.json'.format(config.VAL_DATASET))
     coco = COCO(annofile)
     cocoDt = coco.loadRes(json_file)
-    imgIds = sorted(coco.getImgIds())
     cocoEval = COCOeval(coco, cocoDt, 'bbox')
-    cocoEval.params.imgIds = imgIds
     cocoEval.evaluate()
     cocoEval.accumulate()
     cocoEval.summarize()
+
+    if config.MODE.mask:
+        cocoEval = COCOeval(coco, cocoDt, 'segm')
+        cocoEval.evaluate()
+        cocoEval.accumulate()
+        cocoEval.summarize()

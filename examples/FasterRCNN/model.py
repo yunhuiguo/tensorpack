@@ -513,14 +513,14 @@ def maskrcnn_loss(mask_logits, fg_labels, fg_target_masks):
         fg_labels: #fg, in 1~#class
         fg_target_masks: #fgx14x14, int
     """
-    num_fg = tf.shape(fg_labels)[0]
+    num_fg = tf.size(fg_labels)
     indices = tf.stack([tf.range(num_fg), tf.to_int32(fg_labels) - 1], axis=1)  # #fgx2
     mask_logits = tf.gather_nd(mask_logits, indices)  # #fgx14x14
     mask_probs = tf.sigmoid(mask_logits)
     with tf.name_scope('mask_viz'):
         viz = tf.concat([fg_target_masks, mask_probs], axis=1)
         viz = tf.expand_dims(viz, 3)
-        viz = tf.cast(viz * 255, tf.uint8)
+        viz = tf.cast(viz * 255, tf.uint8, name='viz')
         tf.summary.image('mask_truth|pred', viz, max_outputs=10)
 
     loss = tf.nn.sigmoid_cross_entropy_with_logits(
