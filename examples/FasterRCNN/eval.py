@@ -40,8 +40,8 @@ def fill_full_mask(box, mask, shape):
     x0, y0 = list(map(int, box[:2] + 0.5))
     # box fpcoor=h -> intcoor=h-1, inclusive
     x1, y1 = list(map(int, box[2:] - 0.5))    # inclusive
-    x1 = min(x0, x1)    # require at least 1x1
-    y1 = min(y0, y1)
+    x1 = max(x0, x1)    # require at least 1x1
+    y1 = max(y0, y1)
 
     w = x1 + 1 - x0
     h = y1 + 1 - y0
@@ -106,6 +106,7 @@ def eval_on_dataflow(df, detect_func):
                 mask = r.mask
                 rle = cocomask.encode(
                     np.array(mask[:, :, None], order='F'))[0]
+                rle['counts'] = rle['counts'].decode('ascii')
                 all_results.append({
                     'image_id': img_id,
                     'category_id': cat_id,
