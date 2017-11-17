@@ -108,8 +108,19 @@ class Model(ModelDesc):
             boxes_on_featuremap = proposal_boxes * (1.0 / config.ANCHOR_STRIDE)
 
         roi_resized = roi_align(featuremap, boxes_on_featuremap, 14)
-        feature_fastrcnn = resnet_conv5(roi_resized, config.RESNET_NUM_BLOCK[-1])    # nxcx7x7
-        fastrcnn_label_logits, fastrcnn_box_logits = fastrcnn_head('fastrcnn', feature_fastrcnn, config.NUM_CLASS)
+
+        # https://github.com/tensorflow/tensorflow/issues/14657
+        def ff_true():
+            feature_fastrcnn = resnet_conv5(roi_resized, config.RESNET_NUM_BLOCK[-1])    # nxcx7x7
+            fastrcnn_label_logits, fastrcnn_box_logits = fastrcnn_head('fastrcnn', feature_fastrcnn, config.NUM_CLASS)
+            return feature_fastrcnn, fastrcnn_label_logits, fastrcnn_box_logits
+
+        def ff_false():
+            ncls = config.NUM_CLASS
+            return tf.zeros([0, 2048, 7, 7]), tf.zeros([0, ncls]), tf.zeros([0, ncls - 1, 4])
+
+        feature_fastrcnn, fastrcnn_label_logits, fastrcnn_box_logits = tf.cond(
+            tf.size(boxes_on_featuremap) > 0, ff_true, ff_false)
 
         if is_training:
             # rpn loss
