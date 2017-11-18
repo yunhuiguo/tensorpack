@@ -18,8 +18,8 @@ CLASS_NAMES = []  # NUM_CLASS strings
 RESNET_NUM_BLOCK = [3, 4, 6, 3]     # resnet50
 
 # preprocessing --------------------
-SHORT_EDGE_SIZE = 600
-MAX_SIZE = 1024
+SHORT_EDGE_SIZE = 800
+MAX_SIZE = 1333
 
 # anchors -------------------------
 ANCHOR_STRIDE = 16
@@ -45,7 +45,7 @@ TRAIN_POST_NMS_TOPK = 2000
 CROWD_OVERLAP_THRES = 0.7
 
 # fastrcnn training ---------------------
-FASTRCNN_BATCH_PER_IM = 256
+FASTRCNN_BATCH_PER_IM = 512
 FASTRCNN_BBOX_REG_WEIGHTS = np.array([10, 10, 5, 5], dtype='float32')
 FASTRCNN_FG_THRESH = 0.5
 # keep fg ratio in a batch in this range
