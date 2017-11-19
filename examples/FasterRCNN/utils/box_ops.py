@@ -74,6 +74,9 @@ def get_iou_callable():
     """
     Get a pairwise box iou callable.
     """
+    # We don't want the dataflow process to touch CUDA
+    # Data needs tensorflow. As a result, the training cannot run on GPUs with
+    # EXCLUSIVE_PROCESS mode, unless you disable multiprocessing prefetch.
     with tf.Graph().as_default(), tf.device('/cpu:0'):
         A = tf.placeholder(tf.float32, shape=[None, 4])
         B = tf.placeholder(tf.float32, shape=[None, 4])

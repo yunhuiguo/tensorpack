@@ -66,8 +66,8 @@ def rpn_losses(anchor_labels, anchor_boxes, label_logits, box_logits):
     with tf.device('/cpu:0'):
         valid_mask = tf.stop_gradient(tf.not_equal(anchor_labels, -1))
         pos_mask = tf.stop_gradient(tf.equal(anchor_labels, 1))
-        nr_valid = tf.stop_gradient(tf.count_nonzero(valid_mask), name='num_valid_anchor')
-        nr_pos = tf.count_nonzero(pos_mask, name='num_pos_anchor')
+        nr_valid = tf.stop_gradient(tf.count_nonzero(valid_mask, dtype=tf.int32), name='num_valid_anchor')
+        nr_pos = tf.count_nonzero(pos_mask, dtype=tf.int32, name='num_pos_anchor')
 
         valid_anchor_labels = tf.boolean_mask(anchor_labels, valid_mask)
     valid_label_logits = tf.boolean_mask(label_logits, valid_mask)
@@ -78,16 +78,18 @@ def rpn_losses(anchor_labels, anchor_boxes, label_logits, box_logits):
         with tf.device('/cpu:0'):
             for th in [0.5, 0.2, 0.1]:
                 valid_prediction = tf.cast(valid_label_prob > th, tf.int32)
-                prediction_corr = tf.count_nonzero(tf.equal(valid_prediction, valid_anchor_labels))
-                pos_prediction_corr = tf.count_nonzero(tf.logical_and(
-                    valid_label_prob > th,
-                    tf.equal(valid_prediction, valid_anchor_labels)))
+                nr_pos_prediction = tf.reduce_sum(valid_prediction, name='num_pos_prediction')
+                pos_prediction_corr = tf.count_nonzero(
+                    tf.logical_and(
+                        valid_label_prob > th,
+                        tf.equal(valid_prediction, valid_anchor_labels)),
+                    dtype=tf.int32)
                 summaries.append(tf.truediv(
                     pos_prediction_corr,
                     nr_pos, name='recall_th{}'.format(th)))
-                summaries.append(tf.truediv(
-                    prediction_corr,
-                    nr_valid, name='accuracy_th{}'.format(th)))
+                precision = tf.to_float(tf.truediv(pos_prediction_corr, nr_pos_prediction))
+                precision = tf.where(tf.equal(nr_pos_prediction, 0), 0.0, precision, name='precision_th{}'.format(th))
+                summaries.append(precision)
 
     label_loss = tf.nn.sigmoid_cross_entropy_with_logits(
         labels=tf.to_float(valid_anchor_labels), logits=valid_label_logits)
@@ -132,7 +134,7 @@ def decode_bbox_target(box_predictions, anchors):
     xbyb = box_pred_txty * waha + xaya
     x1y1 = xbyb - wbhb * 0.5
     x2y2 = xbyb + wbhb * 0.5    # (...)x1x2
-    out = tf.concat([x1y1, x2y2], axis=1)
+    out = tf.concat([x1y1, x2y2], axis=-2)
     return tf.reshape(out, orig_shape)
 
 
@@ -308,6 +310,8 @@ def crop_and_resize(image, boxes, box_ind, crop_size):
     Returns:
         n,C,size,size
     """
+    assert isinstance(crop_size, int), crop_size
+
     @under_name_scope()
     def transform_fpcoor_for_tf(boxes, image_shape, crop_shape):
         """
@@ -403,9 +407,6 @@ def fastrcnn_losses(labels, label_logits, fg_boxes, fg_box_logits):
     label_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
         labels=labels, logits=label_logits)
     label_loss = tf.reduce_mean(label_loss, name='label_loss')
-    prediction = tf.argmax(label_logits, axis=1, name='label_prediction')
-    correct = tf.to_float(tf.equal(prediction, labels))  # boolean/integer gather is unavailable on GPU
-    accuracy = tf.reduce_mean(correct, name='accuracy')
 
     fg_inds = tf.where(labels > 0)[:, 0]
     fg_labels = tf.gather(labels, fg_inds)
@@ -415,12 +416,15 @@ def fastrcnn_losses(labels, label_logits, fg_boxes, fg_box_logits):
          tf.to_int32(fg_labels) - 1], axis=1)  # #fgx2
     fg_box_logits = tf.gather_nd(fg_box_logits, indices)
 
-    # some metrics to summarize
-    fg_label_pred = tf.argmax(tf.gather(label_logits, fg_inds), axis=1)
-    num_zero = tf.reduce_sum(tf.to_int32(tf.equal(fg_label_pred, 0)), name='num_zero')
-    false_negative = tf.truediv(num_zero, num_fg, name='false_negative')
-    fg_accuracy = tf.reduce_mean(
-        tf.gather(correct, fg_inds), name='fg_accuracy')
+    with tf.name_scope('label_metrics'), tf.device('/cpu:0'):
+        prediction = tf.argmax(label_logits, axis=1, name='label_prediction')
+        correct = tf.to_float(tf.equal(prediction, labels))  # boolean/integer gather is unavailable on GPU
+        accuracy = tf.reduce_mean(correct, name='accuracy')
+        fg_label_pred = tf.argmax(tf.gather(label_logits, fg_inds), axis=1)
+        num_zero = tf.reduce_sum(tf.to_int32(tf.equal(fg_label_pred, 0)), name='num_zero')
+        false_negative = tf.truediv(num_zero, num_fg, name='false_negative')
+        fg_accuracy = tf.reduce_mean(
+            tf.gather(correct, fg_inds), name='fg_accuracy')
 
     box_loss = tf.losses.huber_loss(
         fg_boxes, fg_box_logits, reduction=tf.losses.Reduction.SUM)

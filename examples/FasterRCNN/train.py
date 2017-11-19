@@ -25,7 +25,7 @@ from coco import COCODetection
 from basemodel import (
     image_preprocess, pretrained_resnet_conv4, resnet_conv5)
 from model import (
-    clip_boxes, decode_bbox_target, encode_bbox_target,
+    clip_boxes, decode_bbox_target, encode_bbox_target, crop_and_resize,
     rpn_head, rpn_losses,
     generate_rpn_proposals, sample_fast_rcnn_targets, roi_align,
     fastrcnn_head, fastrcnn_losses, fastrcnn_predictions)
@@ -81,7 +81,7 @@ class Model(ModelDesc):
         is_training = get_current_tower_context().is_training
         image, anchor_labels, anchor_boxes, gt_boxes, gt_labels = inputs
         fm_anchors = self._get_anchors(image)
-        image = self._preprocess(image)
+        image = self._preprocess(image)     # 1CHW
         image_shape2d = tf.shape(image)[2:]
 
         anchor_boxes_encoded = encode_bbox_target(anchor_boxes, fm_anchors)
@@ -115,6 +115,13 @@ class Model(ModelDesc):
             # fastrcnn loss
             fg_inds_wrt_sample = tf.reshape(tf.where(rcnn_labels > 0), [-1])   # fg inds w.r.t all samples
             fg_sampled_boxes = tf.gather(rcnn_sampled_boxes, fg_inds_wrt_sample)
+
+            with tf.name_scope('fg_sample_patch_viz'):
+                fg_sampled_patches = crop_and_resize(
+                    image, fg_sampled_boxes,
+                    tf.zeros_like(fg_inds_wrt_sample, dtype=tf.int32), 300)
+                fg_sampled_patches = tf.transpose(fg_sampled_patches, [0, 2, 3, 1])
+                tf.summary.image('viz', fg_sampled_patches, max_outputs=30)
 
             matched_gt_boxes = tf.gather(gt_boxes, fg_inds_wrt_gt)
             encoded_boxes = encode_bbox_target(
@@ -301,7 +308,7 @@ if __name__ == '__main__':
 
         cfg = TrainConfig(
             model=Model(),
-            dataflow=get_train_dataflow(),
+            data=QueueInput(get_train_dataflow()),
             callbacks=[
                 PeriodicTrigger(ModelSaver(), every_k_epochs=5),
                 # linear warmup
@@ -313,12 +320,12 @@ if __name__ == '__main__':
                     'learning_rate',
                     [(warmup_epoch * factor, 1e-2),
                      (150000 * factor // stepnum, 1e-3),
-                     (210000 * factor // stepnum, 1e-4)]),
+                     (230000 * factor // stepnum, 1e-4)]),
                 EvalCallback(),
                 GPUUtilizationTracker(),
             ],
             steps_per_epoch=stepnum,
-            max_epoch=230000 * factor // stepnum,
+            max_epoch=280000 * factor // stepnum,
             session_init=get_model_loader(args.load) if args.load else None,
         )
         trainer = SyncMultiGPUTrainerReplicated(get_nr_gpu())

@@ -14,14 +14,14 @@ from six.moves import range, zip
 import threading
 
 from .input_source_base import InputSource
-from ..dataflow import DataFlow, RepeatedData, DataFlowTerminated
+from ..dataflow import DataFlow, MapData, RepeatedData, DataFlowTerminated
 from ..tfutils.summary import add_moving_summary
 from ..tfutils.common import get_op_tensor_name
 from ..tfutils.tower import get_current_tower_context
 from ..utils import logger
 from ..utils.concurrency import ShareSessionThread
 from ..utils.develop import log_deprecated
-from ..callbacks.base import Callback
+from ..callbacks.base import Callback, CallbackFactory
 from ..callbacks.graph import RunOp
 
 __all__ = ['PlaceholderInput', 'FeedInput',
@@ -31,6 +31,10 @@ __all__ = ['PlaceholderInput', 'FeedInput',
            'TFDatasetInput',
            'StagingInputWrapper',
            'StagingInput']
+
+
+def _get_reset_callback(df):
+    return CallbackFactory(setup_graph=lambda _: df.reset_state())
 
 
 class PlaceholderInput(InputSource):
@@ -67,7 +71,6 @@ class FeedInput(InputSource):
             return tf.train.SessionRunArgs(fetches=[], feed_dict=feed)
 
         def _reset(self):
-            self._ds.reset_state()
             self._itr = self._ds.get_data()
 
     def __init__(self, ds, infinite=True):
@@ -99,7 +102,7 @@ class FeedInput(InputSource):
         self._cb._reset()
 
     def _get_callbacks(self):
-        return [self._cb]
+        return [self._cb, _get_reset_callback(self._iter_ds)]
 
 
 class FeedfreeInput(InputSource):
@@ -116,10 +119,8 @@ class EnqueueThread(ShareSessionThread):
         super(EnqueueThread, self).__init__()
         self.name = 'EnqueueThread ' + queue.name
         self.daemon = True
-
-        self.dataflow = RepeatedData(ds, -1)
+        self.dataflow = ds
         self.queue = queue
-
         self.placehdrs = placehdrs
 
         self.op = self.queue.enqueue(self.placehdrs)
@@ -130,7 +131,7 @@ class EnqueueThread(ShareSessionThread):
     def run(self):
         with self.default_sess():
             try:
-                self.reset_dataflow()
+                self.reinitialize_dataflow()
                 while True:
                     # pausable loop
                     self._lock.acquire()
@@ -153,8 +154,7 @@ class EnqueueThread(ShareSessionThread):
                     pass
                 logger.info("{} Exited.".format(self.name))
 
-    def reset_dataflow(self):
-        self.dataflow.reset_state()
+    def reinitialize_dataflow(self):
         self._itr = self.dataflow.get_data()
 
     def pause(self):
@@ -182,6 +182,7 @@ class QueueInput(FeedfreeInput):
         assert isinstance(ds, DataFlow), ds
         self.queue = queue
         self.ds = ds
+        self._inf_ds = RepeatedData(ds, -1)
 
     def _size(self):
         return self.ds.size()
@@ -196,7 +197,7 @@ class QueueInput(FeedfreeInput):
                     50, [x.dtype for x in self._input_placehdrs],
                     name='input_queue')
             logger.info("Setting up the queue '{}' for CPU prefetching ...".format(self.queue.name))
-            self.thread = EnqueueThread(self.queue, self.ds, self._input_placehdrs)
+            self.thread = EnqueueThread(self.queue, self._inf_ds, self._input_placehdrs)
 
             self._dequeue_op = self.queue.dequeue(name='dequeue_for_reset')
 
@@ -214,7 +215,7 @@ class QueueInput(FeedfreeInput):
             pass
 
         # reset dataflow, start thread
-        self.thread.reset_dataflow()
+        self.thread.reinitialize_dataflow()
         self.thread.resume()
 
     def _create_ema_callback(self):
@@ -236,7 +237,7 @@ class QueueInput(FeedfreeInput):
         from ..callbacks.concurrency import StartProcOrThread
         cb = StartProcOrThread(self.thread)
         cb.chief_only = False
-        return [cb, self._create_ema_callback()]
+        return [cb, self._create_ema_callback(), _get_reset_callback(self._inf_ds)]
 
     def _get_input_tensors(self):
         with tf.device('/cpu:0'), self.cached_name_scope():
@@ -299,7 +300,7 @@ class BatchQueueInput(QueueInput):
             for shp in self.queue.shapes:
                 assert shp.is_fully_defined(), shape_err
 
-            self.thread = EnqueueThread(self.queue, self.ds, placehdrs_nobatch)
+            self.thread = EnqueueThread(self.queue, self._inf_ds, placehdrs_nobatch)
 
     def _get_input_tensors(self):
         with tf.device('/cpu:0'), self.cached_name_scope():
@@ -436,7 +437,30 @@ class TFDatasetInput(FeedfreeInput):
         self._init_op.run()
 
     def _get_input_tensors(self):
-        return self._iterator.get_next()
+        desc_shapes = [k.shape for k in self._desc]
+        ret = self._iterator.get_next()
+        assert len(ret) == len(desc_shapes)
+        for t, shp in zip(ret, desc_shapes):
+            t.set_shape(shp)
+        return ret
+
+    @staticmethod
+    def dataflow_to_dataset(df, types):
+        """
+        Wrap a dataflow to tf.data.Dataset.
+        Will reset df.
+
+        Args:
+            df (DataFlow)
+            types([tf.DType])
+        """
+        assert isinstance(df, DataFlow), df
+        assert isinstance(types, (list, tuple)), types
+        df = MapData(df, lambda dp: tuple(dp))
+        df.reset_state()
+        ds = tf.data.Dataset.from_generator(
+            df.get_data, tuple(types))
+        return ds
 
 
 class StagingInput(FeedfreeInput):
