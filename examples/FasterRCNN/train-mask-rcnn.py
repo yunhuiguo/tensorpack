@@ -96,11 +96,10 @@ class Model(ModelDesc):
             tf.reshape(rpn_label_logits, [-1]),
             image_shape2d)
 
-        # sample proposal boxes in training
-        # TODO put in training
-        rcnn_sampled_boxes, rcnn_labels, fg_inds_wrt_gt = sample_fast_rcnn_targets(
-            proposal_boxes, gt_boxes, gt_labels)
         if is_training:
+            # sample proposal boxes in training
+            rcnn_sampled_boxes, rcnn_labels, fg_inds_wrt_gt = sample_fast_rcnn_targets(
+                proposal_boxes, gt_boxes, gt_labels)
             boxes_on_featuremap = rcnn_sampled_boxes * (1.0 / config.ANCHOR_STRIDE)
         else:
             # use all proposal boxes in inference
@@ -128,7 +127,7 @@ class Model(ModelDesc):
 
             # fastrcnn loss
             fg_inds_wrt_sample = tf.reshape(tf.where(rcnn_labels > 0), [-1])   # fg inds w.r.t all samples
-            fg_sampled_boxes = tf.gather(rcnn_sampled_boxes, fg_inds_wrt_sample, name='sampled_fg_boxes')
+            fg_sampled_boxes = tf.gather(rcnn_sampled_boxes, fg_inds_wrt_sample)
             with tf.name_scope('fg_sample_patch_viz'):
                 fg_sampled_patches = crop_and_resize(
                     image, fg_sampled_boxes,
@@ -186,7 +185,6 @@ class Model(ModelDesc):
             final_labels = tf.add(pred_indices[:, 1], 1, name='final_labels')
 
             def f1():
-                # convolution doesn't take empty tensor
                 roi_resized = roi_align(featuremap, final_boxes * (1.0 / config.ANCHOR_STRIDE), 14)
                 feature_maskrcnn = resnet_conv5(roi_resized, config.RESNET_NUM_BLOCK[-1])
                 mask_logits = maskrcnn_head('maskrcnn', feature_maskrcnn, config.NUM_CLASS)   # #result x #cat x 14x14
@@ -304,7 +302,6 @@ class EvalCallback(Callback):
         interval = self.trainer.max_epoch // (EVAL_TIMES + 1)
         self.epochs_to_eval = set([interval * k for k in range(1, EVAL_TIMES)])
         self.epochs_to_eval.add(self.trainer.max_epoch)
-        #self.epochs_to_eval.add(1)
 
     def _eval(self):
         all_results = eval_on_dataflow(self.df, lambda img: detect_one_image(img, self.pred))
