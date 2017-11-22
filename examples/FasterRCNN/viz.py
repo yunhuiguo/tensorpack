@@ -79,7 +79,8 @@ def draw_final_outputs(img, results):
     ret = viz.draw_boxes(img, boxes, tags)
 
     for r in results:
-        ret = draw_mask(ret, r.mask)
+        if r.mask is not None:
+            ret = draw_mask(ret, r.mask)
     return ret
 
 

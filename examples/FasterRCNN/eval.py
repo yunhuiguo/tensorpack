@@ -22,9 +22,10 @@ DetectionResult = namedtuple(
     'DetectionResult',
     ['box', 'score', 'class_id', 'mask'])
 """
-class_id: int, 1~NUM_CLASS
 box: 4 float
 score: float
+class_id: int, 1~NUM_CLASS
+mask: None, or a binary image of the original image shape
 """
 
 
@@ -32,7 +33,7 @@ def fill_full_mask(box, mask, shape):
     """
     Args:
         box: 4 float
-        mask: 14x14 floats
+        mask: MxM floats
         shape: h,w
     """
     # int() is floor
@@ -46,7 +47,8 @@ def fill_full_mask(box, mask, shape):
     w = x1 + 1 - x0
     h = y1 + 1 - y0
 
-    # rounding errors could happen here, masks were not originally computed from integer coords
+    # rounding errors could happen here, because masks were not originally computed for this shape.
+    # but it's hard to do better, because the network does not know the "original" scale
     mask = (cv2.resize(mask, (w, h)) > 0.5).astype('uint8')
     ret = np.zeros(shape, dtype='uint8')
     ret[y0:y1 + 1, x0:x1 + 1] = mask
@@ -60,7 +62,8 @@ def detect_one_image(img, model_func):
 
     Args:
         img: an image
-        model_func: a callable from TF model, takes image and returns (probs, boxes)
+        model_func: a callable from TF model,
+            takes image and returns (boxes, probs, labels, [masks])
 
     Returns:
         [DetectionResult]
@@ -70,16 +73,19 @@ def detect_one_image(img, model_func):
     resizer = CustomResize(config.SHORT_EDGE_SIZE, config.MAX_SIZE)
     resized_img = resizer.augment(img)
     scale = (resized_img.shape[0] * 1.0 / img.shape[0] + resized_img.shape[1] * 1.0 / img.shape[1]) / 2
-    ret = model_func(resized_img)
-    # boxes, probs, labels [, masks]
-    ret[0] = ret[0] / scale
+    boxes, probs, labels, *masks = model_func(resized_img)
+    boxes = boxes / scale
 
-    if config.MODE.mask:
+    if masks:
+        # has mask
         full_masks = [fill_full_mask(box, mask, orig_shape)
-                      for box, mask in zip(ret[0], ret[3])]
-        ret[3] = full_masks
+                      for box, mask in zip(boxes, masks[0])]
+        masks = full_masks
+    else:
+        # fill with none
+        masks = [None] * len(boxes)
 
-    results = [DetectionResult(*args) for args in zip(*ret)]
+    results = [DetectionResult(*args) for args in zip(boxes, probs, labels, masks)]
     return results
 
 
@@ -103,17 +109,20 @@ def eval_on_dataflow(df, detect_func):
                 box[2] -= box[0]
                 box[3] -= box[1]
 
-                mask = r.mask
-                rle = cocomask.encode(
-                    np.array(mask[:, :, None], order='F'))[0]
-                rle['counts'] = rle['counts'].decode('ascii')
-                all_results.append({
+                res = {
                     'image_id': img_id,
                     'category_id': cat_id,
                     'bbox': list(map(lambda x: float(round(x, 1)), box)),
                     'score': float(round(r.score, 2)),
-                    'segmentation': rle
-                })
+                }
+
+                # also append segmentation to results
+                if r.mask is not None:
+                    rle = cocomask.encode(
+                        np.array(r.mask[:, :, None], order='F'))[0]
+                    rle['counts'] = rle['counts'].decode('ascii')
+                    res['segmentation'] = rle
+                all_results.append(res)
             pbar.update(1)
     return all_results
 
@@ -131,7 +140,7 @@ def print_evaluation_scores(json_file):
     cocoEval.accumulate()
     cocoEval.summarize()
 
-    if config.MODE.mask:
+    if config.MODE_MASK:
         cocoEval = COCOeval(coco, cocoDt, 'segm')
         cocoEval.evaluate()
         cocoEval.accumulate()

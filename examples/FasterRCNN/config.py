@@ -3,9 +3,9 @@
 # File: config.py
 
 import numpy as np
-from collections import namedtuple
 
-MODE = namedtuple('Mode', ['mask'])(True)
+# mode flags ---------------------
+MODE_MASK = True
 
 # dataset -----------------------
 BASEDIR = '/path/to/your/COCO/DIR'
@@ -40,7 +40,6 @@ RPN_MIN_SIZE = 0
 RPN_PROPOSAL_NMS_THRESH = 0.7
 TRAIN_PRE_NMS_TOPK = 12000
 TRAIN_POST_NMS_TOPK = 2000
-
 # boxes overlapping crowd will be ignored.
 CROWD_OVERLAP_THRES = 0.7
 

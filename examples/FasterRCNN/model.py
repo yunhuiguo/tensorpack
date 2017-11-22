@@ -90,6 +90,7 @@ def rpn_losses(anchor_labels, anchor_boxes, label_logits, box_logits):
                 precision = tf.to_float(tf.truediv(pos_prediction_corr, nr_pos_prediction))
                 precision = tf.where(tf.equal(nr_pos_prediction, 0), 0.0, precision, name='precision_th{}'.format(th))
                 summaries.append(precision)
+        add_moving_summary(*summaries)
 
     label_loss = tf.nn.sigmoid_cross_entropy_with_logits(
         labels=tf.to_float(valid_anchor_labels), logits=valid_label_logits)
@@ -105,7 +106,7 @@ def rpn_losses(anchor_labels, anchor_boxes, label_logits, box_logits):
         box_loss,
         tf.cast(nr_valid, tf.float32), name='box_loss')
 
-    add_moving_summary(*([label_loss, box_loss, nr_valid, nr_pos] + summaries))
+    add_moving_summary(label_loss, box_loss, nr_valid, nr_pos)
     return label_loss, box_loss
 
 
@@ -126,8 +127,8 @@ def decode_bbox_target(box_predictions, anchors):
     anchors_x1y1x2y2 = tf.reshape(anchors, (-1, 2, 2))
     anchors_x1y1, anchors_x2y2 = tf.split(anchors_x1y1x2y2, 2, axis=1)
 
-    waha = tf.to_float(anchors_x2y2 - anchors_x1y1)
-    xaya = tf.to_float(anchors_x2y2 + anchors_x1y1) * 0.5
+    waha = anchors_x2y2 - anchors_x1y1
+    xaya = (anchors_x2y2 + anchors_x1y1) * 0.5
 
     wbhb = tf.exp(tf.minimum(
         box_pred_twth, config.BBOX_DECODE_CLIP)) * waha
@@ -150,16 +151,15 @@ def encode_bbox_target(boxes, anchors):
     """
     anchors_x1y1x2y2 = tf.reshape(anchors, (-1, 2, 2))
     anchors_x1y1, anchors_x2y2 = tf.split(anchors_x1y1x2y2, 2, axis=1)
-    waha = tf.to_float(anchors_x2y2 - anchors_x1y1)
-    xaya = tf.to_float(anchors_x2y2 + anchors_x1y1) * 0.5
+    waha = anchors_x2y2 - anchors_x1y1
+    xaya = (anchors_x2y2 + anchors_x1y1) * 0.5
 
     boxes_x1y1x2y2 = tf.reshape(boxes, (-1, 2, 2))
     boxes_x1y1, boxes_x2y2 = tf.split(boxes_x1y1x2y2, 2, axis=1)
-    wbhb = tf.to_float(boxes_x2y2 - boxes_x1y1)
-    xbyb = tf.to_float(boxes_x2y2 + boxes_x1y1) * 0.5
+    wbhb = boxes_x2y2 - boxes_x1y1
+    xbyb = (boxes_x2y2 + boxes_x1y1) * 0.5
 
     # Note that here not all boxes are valid. Some may be zero
-
     txty = (xbyb - xaya) / waha
     twth = tf.log(wbhb / waha)  # may contain -inf for invalid boxes
     encoded = tf.concat([txty, twth], axis=1)  # (-1x2x2)
@@ -213,7 +213,6 @@ def generate_rpn_proposals(boxes, scores, img_shape):
         topk_valid_boxes,
         nms_indices, name='boxes')
     final_scores = tf.gather(topk_valid_scores, nms_indices, name='scores')
-    tf.sigmoid(final_scores, name='probs')
     return final_boxes, final_scores
 
 
@@ -293,6 +292,7 @@ def sample_fast_rcnn_targets(boxes, gt_boxes, gt_labels):
     ret_labels = tf.concat(
         [tf.gather(gt_labels, fg_inds_wrt_gt),
          tf.zeros_like(bg_inds, dtype=tf.int64)], axis=0, name='sampled_labels')
+    # stop the gradient -- they are meant to be ground-truth
     return tf.stop_gradient(ret_boxes), tf.stop_gradient(ret_labels), fg_inds_wrt_gt
 
 
@@ -520,6 +520,8 @@ def maskrcnn_loss(mask_logits, fg_labels, fg_target_masks):
     indices = tf.stack([tf.range(num_fg), tf.to_int32(fg_labels) - 1], axis=1)  # #fgx2
     mask_logits = tf.gather_nd(mask_logits, indices)  # #fgx14x14
     mask_probs = tf.sigmoid(mask_logits)
+
+    # add some training visualizations to tensorboard
     with tf.name_scope('mask_viz'):
         viz = tf.concat([fg_target_masks, mask_probs], axis=1)
         viz = tf.expand_dims(viz, 3)

@@ -232,8 +232,9 @@ def get_train_dataflow(add_mask=False):
         ret = [im, fm_labels, fm_boxes, boxes, klass]
 
         # masks
-        segmentation = copy.deepcopy(img.get('segmentation', None))
-        if segmentation is not None:
+        if add_mask:
+            # augmentation will modify the polys in-place
+            segmentation = copy.deepcopy(img.get('segmentation', None))
             segmentation = [segmentation[k] for k in range(len(segmentation)) if not is_crowd[k]]
             assert len(segmentation) == len(boxes)
 
@@ -253,7 +254,7 @@ def get_train_dataflow(add_mask=False):
         return ret
 
     ds = MapData(ds, preprocess)
-    # ds = PrefetchDataZMQ(ds, 1)
+    ds = PrefetchDataZMQ(ds, 1)
     return ds
 
 
