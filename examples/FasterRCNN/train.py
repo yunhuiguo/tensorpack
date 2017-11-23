@@ -173,7 +173,7 @@ class Model(ModelDesc):
                 target_masks_for_fg = tf.squeeze(target_masks_for_fg, 1, 'sampled_fg_mask_targets')
                 mrcnn_loss = maskrcnn_loss(mask_logits, fg_labels, target_masks_for_fg)
             else:
-                mrcnn_loss = 0
+                mrcnn_loss = 0.0
 
             wd_cost = regularize_cost(
                 '(?:group1|group2|group3|rpn|fastrcnn|maskrcnn)/.*W',
