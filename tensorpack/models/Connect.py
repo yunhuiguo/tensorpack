@@ -40,7 +40,7 @@ class Connect(object):
 
         def layer_func(name, *args, **kwargs):
             self._output.__getattr__(name, *args, **kwargs)
-            return Sequential(self._output())
+            return Sequential(self._output()())
         return layer_func
 
     def __call__(self):
