@@ -45,7 +45,7 @@ class Connect(object):
         print "\n\n"
         print "success"
         print "\n\n"
-        return Sequential(outputs)
+        return outputs
 
 
     def __getattr__(self, layer_name):
