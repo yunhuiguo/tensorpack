@@ -12,14 +12,13 @@ from .fc import FullyConnected
 __all__ = ['Connect']
 
 class Connect(object):
-    """ A simple wrapper to easily create "linear" graph,
-        consisting of layers / symbolic functions with only one input & output.
+    """ Connect a list of sensors
     """
-
     def __init__(self, name, sensors_list):
         """
         Args:
-            tensor (tf.Tensor): the tensor to wrap
+            name: name of the network
+            tensors_list: a list of sensors to connect
         """
         self._sensors_list = sensors_list
         print(type(self._sensors_list))
@@ -35,26 +34,25 @@ class Connect(object):
                 if method == "inner_product":
                     w = tf.get_variable("w_"+str(sensor_idx), [n_input, 1],
                         initializer=tf.contrib.layers.variance_scaling_initializer(2.0))
-
                     output = tf.matmul(sensor_output, w)
                     outputs.append(output)
+                elif method == "concat":
+                    outputs = self._sensors_list
 
         outputs = tf.concat(outputs, axis=1)
         return Sequential(outputs)
 
     def __getattr__(self, layer_name):
 
-        def layer_funcs(name, *args, **kwargs):
-            print type(self._output)
-            obj = self._output.__getattr__(layer_name)
-            return obj(name, *args, **kwargs)
-
-        return layer_funcs
+        def layer_func(name, *args, **kwargs):
+            func = self._output.__getattr__(layer_name)
+            return func(name, *args, **kwargs)
+        return layer_func
 
     def __call__(self):
         """
         Returns:
-            tf.Tensor: the underlying wrapped tensor.
+            tf.Tensor: .
         """
         return self._output
 
