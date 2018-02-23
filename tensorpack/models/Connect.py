@@ -26,7 +26,6 @@ class Connect(object):
         """
         self._sensor_list = sensors_list
         self.name = name
-        self._output = self.connect_sensors()
 
     def connect_sensors(self, method = "inner_product"):
         outputs = []
@@ -38,37 +37,11 @@ class Connect(object):
         	output = FullyConnected(sensor_output, sensor_output.shape[1], activation=tf.identity)
 
         outputs = tf.concat(outputs, axis=1)
-        return outputs
+        self._output = outputs
 
 
     def __getattr__(self, layer_name):
-        layer = get_registered_layer(layer_name)
-
-        if layer is not None:
-            # this is a registered tensorpack layer
-            # parse arguments by tensorpack model convention
-            if layer.use_scope:
-                def layer_func(name, *args, **kwargs):
-                    if self._t != None:
-                        ret = layer(name, self._output, *args, **kwargs)
-                        return Sequential(ret)
-            else:
-                def layer_func(*args, **kwargs):
-                    if len(args) and isinstance(args[0], six.string_types):
-                        name, args = args[0], args[1:]
-                        ret = layer(name, self._output, *args, **kwargs)
-                    else:
-                        ret = layer(self._output, *args, **kwargs)
-                    return Sequential(ret)
-            return layer_func
-        else:
-            assert layer_name == 'tf', \
-                "Calling Sequential.{}:" \
-                " neither a layer nor 'tf'! " \
-                "Did you forget to extract tensor from Sequential?".format(layer_name)
-            import tensorflow as layer  # noqa
-            assert isinstance(layer, ModuleType), layer
-            return Sequential._TFModuleFunc(layer, self._output)  
+        return Sequential(self._output)
 
     def __call__(self):
         """
