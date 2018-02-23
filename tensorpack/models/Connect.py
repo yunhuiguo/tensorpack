@@ -15,12 +15,13 @@ class Connect(object):
         consisting of layers / symbolic functions with only one input & output.
     """
 
-    def __init__(self, name, sensors_list = None):
+    def __init__(self, name, sensors_list):
         """
         Args:
             tensor (tf.Tensor): the tensor to wrap
         """
         self._sensor_list = sensors_list
+        print(type(self._sensor_list))
         self.name = name
         self._output = self.connect_sensors()
 
