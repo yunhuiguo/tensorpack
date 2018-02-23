@@ -25,7 +25,8 @@ class Connect(object):
         self._sensor_list = sensors_list
         self.name = name
         self._output = self.connect_sensors()
-
+        
+    @layer_register(use_scope=True)
     def connect_sensors(self, method = "inner_product"):
         outputs = []
         print "\n\n"
