@@ -2,7 +2,6 @@
 # -*- coding: UTF-8 -*-
 # File: fc.py
 
-
 import tensorflow as tf
 
 from .common import layer_register, VariableHolder

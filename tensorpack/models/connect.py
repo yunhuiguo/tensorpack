@@ -7,7 +7,8 @@ import tensorflow as tf
 from .common import layer_register, VariableHolder
 from .tflayer import convert_to_tflayer_args, rename_get_variable
 from ..tfutils import symbolic_functions as symbf
-from . import Sequential
+from . import Sequential, fc
+
 
 __all__ = ['Connect']
 
@@ -25,25 +26,15 @@ class Connect(object):
         self._sensor_list = sensors_list
         self.name = name
         self._output = self.connect_sensors()
-        
-    @layer_register(use_scope=True)
+
     def connect_sensors(self, method = "inner_product"):
         outputs = []
         print "\n\n"
         print "success"
         print "\n\n"
+     
         for sensor_idx, sensor_output in enumerate(self.sensors_list):
-
-            with tf.variable_scope("connect_sensor_" + str(sensor_idx)):
-                n_input = int(sensor_output.shape[1])
-                if method == "inner_product":
-                    w = tf.get_variable("weight_"+str(sensor_idx), [n_input, 1],
-                        initializer=tf.contrib.layers.xavier_initializer())
-
-                    output = tf.matmul(sensor_output, w)
-                    outputs.append(output)
-                elif method == "concat":
-                    outputs.append(sensor_output)
+        	output = FullyConnected(sensor_output, sensor_output.shape[1], activation=tf.identity)
         outputs = tf.concat(outputs, axis=1)
  
         return outputs
