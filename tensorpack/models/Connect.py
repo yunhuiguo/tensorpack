@@ -40,8 +40,8 @@ class Connect(object):
     def __getattr__(self, layer_name):
 
         def layer_func(name, *args, **kwargs):
-            obj = self._output.__getattr__(layer_name)(name, *args, **kwargs)
-            return obj
+            obj = self._output.__getattr__(layer_name)
+            return obj(name, *args, **kwargs)
 
         return layer_func
 

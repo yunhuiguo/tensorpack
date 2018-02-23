@@ -46,8 +46,7 @@ class Model(ModelDesc):
         # inputs contains a list of input variables defined above
         image1, image2, label = inputs
         print "\n\n"
-        print type(Sequential(image1)
-              .FullyConnected('fc0', 512, activation=tf.nn.relu))
+ 
 
         # In tensorflow, inputs to convolution function are assumed to be
         # NHWC. Add a single channel here.
