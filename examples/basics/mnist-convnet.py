@@ -5,6 +5,7 @@
 import os
 import argparse
 import tensorflow as tf
+import numpy as np
 """
 MNIST ConvNet example.
 about 0.6% validation error after 30 epochs.
@@ -16,8 +17,18 @@ from tensorpack import *
 from tensorpack.tfutils import summary
 from tensorpack.dataflow import dataset
 
-IMAGE_SIZE = 28
 
+def batch_flatten(x):
+    """
+    Flatten the tensor except the first dimension.
+    """
+    shape = x.get_shape().as_list()[1:]
+    if None not in shape:
+        return tf.reshape(x, [-1, int(np.prod(shape))])
+    return tf.reshape(x, tf.stack([tf.shape(x)[0], -1]))
+
+
+IMAGE_SIZE = 784
 
 class Model(ModelDesc):
     def _get_inputs(self):
@@ -25,7 +36,7 @@ class Model(ModelDesc):
         Define all the inputs (with type, shape, name) that
         the graph will need.
         """
-        return [InputDesc(tf.float32, (None, IMAGE_SIZE, IMAGE_SIZE), 'input'),
+        return [InputDesc(tf.float32, (None, IMAGE_SIZE), 'input'),
                 InputDesc(tf.int32, (None,), 'label')]
 
     def _build_graph(self, inputs):
@@ -34,22 +45,20 @@ class Model(ModelDesc):
 
         # inputs contains a list of input variables defined above
         image, label = inputs
+        image = batch_flatten(image)
+
+        print "\n\n"
+        print image.shape
 
         # In tensorflow, inputs to convolution function are assumed to be
         # NHWC. Add a single channel here.
-        image = tf.expand_dims(image, 3)
+        #image = tf.expand_dims(image, 3)
 
         image = image * 2 - 1   # center the pixels values at zero
         # The context manager `argscope` sets the default option for all the layers under
         # this context. Here we use 32 channel convolution with shape 3x3
         with argscope(Conv2D, kernel_shape=3, nl=tf.nn.relu, out_channel=32):
             logits = (LinearWrap(image)
-                      .Conv2D('conv0')
-                      .MaxPooling('pool0', 2)
-                      .Conv2D('conv1')
-                      .Conv2D('conv2')
-                      .MaxPooling('pool1', 2)
-                      .Conv2D('conv3')
                       .FullyConnected('fc0', 512, activation=tf.nn.relu)
                       .Dropout('dropout', rate=0.5)
                       .FullyConnected('fc1', 10, activation=tf.identity)())
@@ -120,7 +129,7 @@ def get_config():
                 ScalarStats(['cross_entropy_loss', 'accuracy'])),
         ],
         steps_per_epoch=steps_per_epoch,
-        max_epoch=100,
+        max_epoch=1,
     )
 
 
