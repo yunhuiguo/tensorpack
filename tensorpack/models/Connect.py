@@ -22,6 +22,7 @@ class Connect(object):
         """
         self._sensor_list = sensors_list
         self.name = name
+        self._output = self.connect_sensors()
 
     def connect_sensors(self, method = "inner_product"):
         outputs = []
@@ -31,7 +32,7 @@ class Connect(object):
             outputs.append(output)
 
         outputs = tf.concat(outputs, axis=1)
-        self._output = Sequential(outputs)
+        return Sequential(outputs)
 
     def __getattr__(self, layer_name):
 
