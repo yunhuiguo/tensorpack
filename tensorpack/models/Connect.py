@@ -30,9 +30,11 @@ class Connect(object):
         for sensor_idx, sensor_output in enumerate(self._sensors_list):
             with tf.variable_scope("connect_sensor_" + str(sensor_idx)):
                 n_input = int(sensor_output.shape[1])
+
                 if method == "inner_product":
                     w = tf.get_variable("w_"+str(sensor_idx), [n_input, 1],
-                        initializer=self.initializer())
+                        initializer=tf.contrib.layers.variance_scaling_initializer(2.0))
+
                     output = tf.matmul(sensor_output, w)
                     outputs.append(output)
 
@@ -41,12 +43,12 @@ class Connect(object):
 
     def __getattr__(self, layer_name):
 
-        def layer_func(name, *args, **kwargs):
+        def layer_funcs(name, *args, **kwargs):
             print type(self._output)
             obj = self._output.__getattr__(layer_name)
             return obj(name, *args, **kwargs)
 
-        return layer_func
+        return layers_func
 
     def __call__(self):
         """
