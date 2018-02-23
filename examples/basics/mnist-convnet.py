@@ -62,15 +62,13 @@ class Model(ModelDesc):
 
 
         sensor2 = (Sequential(image2)
-              .FullyConnected('fc0', 512, activation=tf.nn.relu)
-              .FullyConnected('fc1', 10, activation=tf.identity)())
+              .FullyConnected('fc2', 512, activation=tf.nn.relu)
+              .FullyConnected('fc3', 10, activation=tf.identity)())
 
 
-        logits = (Sequential()
-                  .Connect([sensor1, sensor2])
-                  .FullyConnected('fc0', 512, activation=tf.nn.relu)
-                  .FullyConnected('fc1', 10, activation=tf.identity)())
-
+        logits = (Connect([sensor1, sensor2])
+                  .FullyConnected('fc4', 512, activation=tf.nn.relu)
+                  .FullyConnected('fc5', 10, activation=tf.identity)())
 
 
         tf.nn.softmax(logits, name='prob')   # a Bx10 with probabilities

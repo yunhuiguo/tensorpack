@@ -31,22 +31,25 @@ class Sequential(object):
                     return Sequential(o)
                 return f
 
-    def __init__(self, tensor):
+    def __init__(self, name, tensor = None):
         """
         Args:
             tensor (tf.Tensor): the tensor to wrap
         """
         self._t = tensor
+        self.name = name
 
     def __getattr__(self, layer_name):
         layer = get_registered_layer(layer_name)
+
         if layer is not None:
             # this is a registered tensorpack layer
             # parse arguments by tensorpack model convention
             if layer.use_scope:
                 def layer_func(name, *args, **kwargs):
-                    ret = layer(name, self._t, *args, **kwargs)
-                    return Sequential(ret)
+                    if self._t != None:
+                        ret = layer(name, self._t, *args, **kwargs)
+                        return Sequential(ret)
             else:
                 def layer_func(*args, **kwargs):
                     if len(args) and isinstance(args[0], six.string_types):
