@@ -11,7 +11,6 @@ MNIST ConvNet example.
 about 0.6% validation error after 30 epochs.
 """
 
-
 # Just import everything into current namespace
 from tensorpack import *
 from tensorpack.tfutils import summary
@@ -28,7 +27,7 @@ def batch_flatten(x):
     return tf.reshape(x, tf.stack([tf.shape(x)[0], -1]))
 
 
-IMAGE_SIZE = 784
+IMAGE_SIZE = 392
 
 class Model(ModelDesc):
     def _get_inputs(self):
@@ -36,7 +35,8 @@ class Model(ModelDesc):
         Define all the inputs (with type, shape, name) that
         the graph will need.
         """
-        return [InputDesc(tf.float32, (None, IMAGE_SIZE), 'input'),
+        return [InputDesc(tf.float32, (None, IMAGE_SIZE), 'input1'),
+                InputDesc(tf.float32, (None, IMAGE_SIZE), 'input2'),
                 InputDesc(tf.int32, (None,), 'label')]
 
     def _build_graph(self, inputs):
@@ -44,24 +44,34 @@ class Model(ModelDesc):
         and define self.cost at the end"""
 
         # inputs contains a list of input variables defined above
-        image, label = inputs
-        image = batch_flatten(image)
+        image1, image2, label = inputs
 
-        print "\n\n"
-        print image.shape
 
         # In tensorflow, inputs to convolution function are assumed to be
         # NHWC. Add a single channel here.
         #image = tf.expand_dims(image, 3)
 
-        image = image * 2 - 1   # center the pixels values at zero
+        #image = image * 2 - 1   # center the pixels values at zero
         # The context manager `argscope` sets the default option for all the layers under
         # this context. Here we use 32 channel convolution with shape 3x3
-        with argscope(Conv2D, kernel_shape=3, nl=tf.nn.relu, out_channel=32):
-            logits = (LinearWrap(image)
-                      .FullyConnected('fc0', 512, activation=tf.nn.relu)
-                      .Dropout('dropout', rate=0.5)
-                      .FullyConnected('fc1', 10, activation=tf.identity)())
+
+
+        sensor1 = (Sequential(image1)
+              .FullyConnected('fc0', 512, activation=tf.nn.relu)
+              .FullyConnected('fc1', 10, activation=tf.identity)())
+
+
+        sensor2 = (Sequential(image2)
+              .FullyConnected('fc0', 512, activation=tf.nn.relu)
+              .FullyConnected('fc1', 10, activation=tf.identity)())
+
+
+        logits = (Sequential()
+                  .Connect([sensor1, sensor2])
+                  .FullyConnected('fc0', 512, activation=tf.nn.relu)
+                  .FullyConnected('fc1', 10, activation=tf.identity)())
+
+
 
         tf.nn.softmax(logits, name='prob')   # a Bx10 with probabilities
 
@@ -104,26 +114,25 @@ class Model(ModelDesc):
 
 def get_data():
     train = BatchData(dataset.Mnist('train'), 128)
-    test = BatchData(dataset.Mnist('test'), 256, remainder=True)
 
+
+    test = BatchData(dataset.Mnist('test'), 256, remainder=True)
     train = PrintData(train)
 
     return train, test
 
 
 def get_config():
+
     dataset_train, dataset_test = get_data()
-    print "ok"
-    print dataset_train.size()
-    print "\n\n"
     # How many iterations you want in each epoch.
     # This is the default value, don't actually need to set it in the config
     steps_per_epoch = dataset_train.size()
 
     # get the config which contains everything necessary in a training
     return TrainConfig(
-        model=Model(),
-        dataflow=dataset_train,  # the DataFlow instance for training
+        model= Model(),
+        dataflow= dataset_train,  # the DataFlow instance for training
         callbacks=[
             ModelSaver(),   # save the model after every epoch
             MaxSaver('validation_accuracy'),  # save the model with highest accuracy (prefix 'validation_')
@@ -137,6 +146,7 @@ def get_config():
 
 
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.')
     parser.add_argument('--load', help='load model')

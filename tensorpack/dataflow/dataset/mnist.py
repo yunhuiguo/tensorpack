@@ -110,8 +110,13 @@ class Mnist(RNGDataFlow):
         for k in idxs:
             #img = self.images[k].reshape((28, 28))
             img = self.images[k].reshape((784,))
+
+            img1 = img[0:392]
+            img2 = img[392:]
+
             label = self.labels[k]
-            yield [img, label]
+
+            yield [img1, img2, label]
 
 
 class FashionMnist(Mnist):
