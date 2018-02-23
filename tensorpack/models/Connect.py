@@ -29,9 +29,7 @@ class Connect(object):
         outputs = []
         for sensor_idx, sensor in enumerate(sensors):
             with tf.variable_scope("connect_sensor_" + str(sensor_idx)):
-                sensor_output = sensor.build_layers()
                 n_input = int(sensor_output.shape[1])
-
                 if method == "inner_product":
                     w = tf.get_variable("w_"+str(sensor_idx), [n_input, 1],
                         initializer=self.initializer())
