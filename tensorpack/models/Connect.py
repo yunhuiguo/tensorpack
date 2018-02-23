@@ -6,7 +6,8 @@ import tensorflow as tf
 
 import six
 from types import ModuleType
-from . import Sequential, fc
+from .Sequential import Sequential
+from .fc import FullyConnected
 
 __all__ = ['Connect']
 
