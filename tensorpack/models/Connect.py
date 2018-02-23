@@ -1,18 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
-# File: fc.py
+# File: Connect.py
 
 import tensorflow as tf
 
 import six
 from types import ModuleType
-from .registry import get_registered_layers
-
 from . import Sequential, fc
 
-
 __all__ = ['Connect']
-
 
 class Connect(object):
     """ A simple wrapper to easily create "linear" graph,
@@ -35,13 +31,17 @@ class Connect(object):
      
         for sensor_idx, sensor_output in enumerate(self.sensors_list):
         	output = FullyConnected(sensor_output, sensor_output.shape[1], activation=tf.identity)
+            outputs.append(output)
 
         outputs = tf.concat(outputs, axis=1)
-        self._output = outputs
-
+        self._output = Sequential(outputs)
 
     def __getattr__(self, layer_name):
-        return Sequential(self._output)
+
+        def layer_func()
+            self._output.__getattr__(layer_name)
+            return Sequential(self._output())
+        return layer_func
 
     def __call__(self):
         """
