@@ -68,7 +68,7 @@ class Model(ModelDesc):
 
         print "\n\ntype"
         print type(sensor1)
-
+        print type(Connect('cloud', [sensor1, sensor2]))
 
         logits = (Connect('cloud', [sensor1, sensor2])
                   .FullyConnected('fc4', 512, activation=tf.nn.relu)

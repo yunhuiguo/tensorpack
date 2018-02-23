@@ -4,6 +4,10 @@
 
 import tensorflow as tf
 
+import six
+from types import ModuleType
+from .registry import get_registered_layers
+
 from .common import layer_register, VariableHolder
 from .tflayer import convert_to_tflayer_args, rename_get_variable
 from ..tfutils import symbolic_functions as symbf
@@ -35,8 +39,8 @@ class Connect(object):
      
         for sensor_idx, sensor_output in enumerate(self.sensors_list):
         	output = FullyConnected(sensor_output, sensor_output.shape[1], activation=tf.identity)
+
         outputs = tf.concat(outputs, axis=1)
- 
         return outputs
 
 
