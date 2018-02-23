@@ -69,15 +69,15 @@ class Model(ModelDesc):
         print "\n\ntype"
         print type(sensor1)
 
-
+        '''
         logits = (Connect('cloud', [sensor1, sensor2])
                   .FullyConnected('fc4', 512, activation=tf.nn.relu)
                   .FullyConnected('fc5', 10, activation=tf.identity)())
         print "\n\ntype"
         print type(logits)
+        '''
 
-
-        tf.nn.softmax(logits, name='prob')   # a Bx10 with probabilities
+        tf.nn.softmax(sensor1, name='prob')   # a Bx10 with probabilities
 
         # a vector of length B with loss of each sample
         cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
