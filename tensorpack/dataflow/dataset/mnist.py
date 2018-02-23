@@ -109,7 +109,7 @@ class Mnist(RNGDataFlow):
             self.rng.shuffle(idxs)
         for k in idxs:
             #img = self.images[k].reshape((28, 28))
-            img = self.images[k].reshape((1,784))
+            img = self.images[k].reshape((,784))
             label = self.labels[k]
             yield [img, label]
 
