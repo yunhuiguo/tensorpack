@@ -1,16 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# File: linearwrap.py
+# File: Sequential.py
 
 
 import six
 from types import ModuleType
 from .registry import get_registered_layer
 
-__all__ = ['LinearWrap']
+__all__ = ['Sequential']
 
 
-class LinearWrap(object):
+class Sequential(object):
     """ A simple wrapper to easily create "linear" graph,
         consisting of layers / symbolic functions with only one input & output.
     """
@@ -23,12 +23,12 @@ class LinearWrap(object):
         def __getattr__(self, name):
             ret = getattr(self._mod, name)
             if isinstance(ret, ModuleType):
-                return LinearWrap._TFModuleFunc(ret, self._t)
+                return Sequential._TFModuleFunc(ret, self._t)
             else:
                 # assume to be a tf function
                 def f(*args, **kwargs):
                     o = ret(self._t, *args, **kwargs)
-                    return LinearWrap(o)
+                    return Sequential(o)
                 return f
 
     def __init__(self, tensor):
@@ -46,7 +46,7 @@ class LinearWrap(object):
             if layer.use_scope:
                 def layer_func(name, *args, **kwargs):
                     ret = layer(name, self._t, *args, **kwargs)
-                    return LinearWrap(ret)
+                    return Sequential(ret)
             else:
                 def layer_func(*args, **kwargs):
                     if len(args) and isinstance(args[0], six.string_types):
@@ -54,26 +54,26 @@ class LinearWrap(object):
                         ret = layer(name, self._t, *args, **kwargs)
                     else:
                         ret = layer(self._t, *args, **kwargs)
-                    return LinearWrap(ret)
+                    return Sequential(ret)
             return layer_func
         else:
             assert layer_name == 'tf', \
-                "Calling LinearWrap.{}:" \
+                "Calling Sequential.{}:" \
                 " neither a layer nor 'tf'! " \
-                "Did you forget to extract tensor from LinearWrap?".format(layer_name)
+                "Did you forget to extract tensor from Sequential?".format(layer_name)
             import tensorflow as layer  # noqa
             assert isinstance(layer, ModuleType), layer
-            return LinearWrap._TFModuleFunc(layer, self._t)
+            return Sequential._TFModuleFunc(layer, self._t)
 
     def apply(self, func, *args, **kwargs):
         """
         Apply a function on the wrapped tensor.
 
         Returns:
-            LinearWrap: ``LinearWrap(func(self.tensor(), *args, **kwargs))``.
+            Sequential: ``Sequential(func(self.tensor(), *args, **kwargs))``.
         """
         ret = func(self._t, *args, **kwargs)
-        return LinearWrap(ret)
+        return Sequential(ret)
 
     def apply2(self, func, *args, **kwargs):
         """
@@ -81,10 +81,10 @@ class LinearWrap(object):
         will be the second argument of func.
 
         Returns:
-            LinearWrap: ``LinearWrap(func(args[0], self.tensor(), *args[1:], **kwargs))``.
+            Sequential: ``Sequential(func(args[0], self.tensor(), *args[1:], **kwargs))``.
         """
         ret = func(args[0], self._t, *(args[1:]), **kwargs)
-        return LinearWrap(ret)
+        return Sequential(ret)
 
     def __call__(self):
         """
@@ -105,7 +105,7 @@ class LinearWrap(object):
     def print_tensor(self):
         """
         Print the underlying tensor and return self. Can be useful to get the
-        name of tensors inside :class:`LinearWrap`.
+        name of tensors inside :class:`Sequential`.
 
         :return: self
         """
