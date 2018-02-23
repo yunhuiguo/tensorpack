@@ -25,9 +25,6 @@ class Connect(object):
 
     def connect_sensors(self, method = "inner_product"):
         outputs = []
-        print "\n\n"
-        print "success"
-        print "\n\n"
      
         for sensor_idx, sensor_output in enumerate(self.sensors_list):
             output = FullyConnected(sensor_output, sensor_output.shape[1], activation=tf.identity)
@@ -35,11 +32,11 @@ class Connect(object):
 
         outputs = tf.concat(outputs, axis=1)
         self._output = Sequential(outputs)
-        print type(self._output)
 
     def __getattr__(self, layer_name):
 
         def layer_func(name, *args, **kwargs):
+            print type(self._output)
             obj = self._output.__getattr__(layer_name)
             return obj(name, *args, **kwargs)
 
