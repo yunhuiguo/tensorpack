@@ -46,7 +46,8 @@ class Model(ModelDesc):
         # inputs contains a list of input variables defined above
         image1, image2, label = inputs
         print "\n\n"
-        print image1
+        print type(Sequential(image1)
+              .FullyConnected('fc0', 512, activation=tf.nn.relu))
 
         # In tensorflow, inputs to convolution function are assumed to be
         # NHWC. Add a single channel here.
@@ -55,6 +56,8 @@ class Model(ModelDesc):
         #image = image * 2 - 1   # center the pixels values at zero
         # The context manager `argscope` sets the default option for all the layers under
         # this context. Here we use 32 channel convolution with shape 3x3
+
+
 
 
         sensor1 = (Sequential(image1)
@@ -66,13 +69,11 @@ class Model(ModelDesc):
               .FullyConnected('fc2', 512, activation=tf.nn.relu)
               .FullyConnected('fc3', 10, activation=tf.identity)())
 
-        print "\n\ntype"
-        print type(sensor1)
-        print type(Connect('cloud', [sensor1, sensor2]))
 
         logits = (Connect('cloud', [sensor1, sensor2])
                   .FullyConnected('fc4', 512, activation=tf.nn.relu)
                   .FullyConnected('fc5', 10, activation=tf.identity)())
+
         print "\n\ntype"
         print type(logits)
 

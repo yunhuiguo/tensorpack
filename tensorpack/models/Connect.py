@@ -35,11 +35,12 @@ class Connect(object):
 
         outputs = tf.concat(outputs, axis=1)
         self._output = Sequential(outputs)
+        print type(self._output)
 
     def __getattr__(self, layer_name):
 
         def layer_func(name, *args, **kwargs):
-            obj = self._output.__getattr__(layer_name)
+            obj = self._output.__getattr__(layer_name)(name, *args, **kwargs)
             return obj
 
         return layer_func

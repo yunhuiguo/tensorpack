@@ -66,7 +66,7 @@ class Sequential(object):
             import tensorflow as layer  # noqa
             assert isinstance(layer, ModuleType), layer
             return Sequential._TFModuleFunc(layer, self._t)
-
+    
     def apply(self, func, *args, **kwargs):
         """
         Apply a function on the wrapped tensor.
