@@ -73,6 +73,8 @@ class Model(ModelDesc):
         logits = (Connect('cloud', [sensor1, sensor2])
                   .FullyConnected('fc4', 512, activation=tf.nn.relu)
                   .FullyConnected('fc5', 10, activation=tf.identity)())
+        print "\n\ntype"
+        print type(logits)
 
 
         tf.nn.softmax(logits, name='prob')   # a Bx10 with probabilities
