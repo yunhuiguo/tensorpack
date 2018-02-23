@@ -30,6 +30,7 @@ class Connect(object):
         outputs = []
 
         for sensor_idx, sensor_output in enumerate(self.sensors_list):
+
             with tf.variable_scope("connect_sensor_" + str(sensor_idx)):
                 n_input = int(sensor_output.shape[1])
                 if method == "inner_product":
@@ -38,12 +39,13 @@ class Connect(object):
 
                     output = tf.matmul(sensor_output, w)
                     outputs.append(output)
-
                 elif method == "concat":
                     outputs.append(sensor_output)
         outputs = tf.concat(outputs, axis=1)
-
-        return Sequential(outputs)()
+        print "\n\n"
+        print "success"
+        print "\n\n"
+        return Sequential(outputs)
 
 
     def __getattr__(self, layer_name):

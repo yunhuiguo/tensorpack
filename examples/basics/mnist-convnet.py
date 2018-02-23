@@ -66,6 +66,8 @@ class Model(ModelDesc):
               .FullyConnected('fc2', 512, activation=tf.nn.relu)
               .FullyConnected('fc3', 10, activation=tf.identity)())
 
+        print "\n\ntype"
+        print type(sensor1)
 
 
         logits = (Connect('cloud', [sensor1, sensor2])
