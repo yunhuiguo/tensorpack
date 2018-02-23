@@ -26,8 +26,7 @@ class Connect(object):
 
     def connect_sensors(self, method = "inner_product"):
         outputs = []
-     
-        for sensor_idx, sensor_output in enumerate(self.sensors_list):
+        for sensor_idx, sensor_output in enumerate(self._sensors_list):
             output = FullyConnected(sensor_output, sensor_output.shape[1], activation=tf.identity)
             outputs.append(output)
 
