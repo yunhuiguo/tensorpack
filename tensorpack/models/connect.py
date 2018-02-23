@@ -7,6 +7,7 @@ import tensorflow as tf
 from .common import layer_register, VariableHolder
 from .tflayer import convert_to_tflayer_args, rename_get_variable
 from ..tfutils import symbolic_functions as symbf
+from . import Sequential
 
 __all__ = ['Connect']
 
@@ -41,7 +42,7 @@ class Connect(object):
                 elif method == "concat":
                     outputs.append(sensor_output)
         outputs = tf.concat(outputs, axis=1)
-        return outputs
+        return Sequential(outputs)
 
 
     def __getattr__(self, layer_name):

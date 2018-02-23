@@ -57,12 +57,12 @@ class Model(ModelDesc):
         # this context. Here we use 32 channel convolution with shape 3x3
 
 
-        sensor1 = (Sequential("sensor1", image1)
+        sensor1 = (Sequential(image1)
               .FullyConnected('fc0', 512, activation=tf.nn.relu)
               .FullyConnected('fc1', 10, activation=tf.identity)())
 
 
-        sensor2 = (Sequential('sensor2', image2)
+        sensor2 = (Sequential(image2)
               .FullyConnected('fc2', 512, activation=tf.nn.relu)
               .FullyConnected('fc3', 10, activation=tf.identity)())
 
