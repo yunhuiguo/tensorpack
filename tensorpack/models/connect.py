@@ -24,15 +24,13 @@ class Connect(object):
         """
         self._sensor_list = sensors_list
         self.name = name
-        print "\n\n"
-        print "success"
-        print "\n\n"
-
         self._output = self.connect_sensors()
 
     def connect_sensors(self, method = "inner_product"):
         outputs = []
-
+        print "\n\n"
+        print "success"
+        print "\n\n"
         for sensor_idx, sensor_output in enumerate(self.sensors_list):
 
             with tf.variable_scope("connect_sensor_" + str(sensor_idx)):
