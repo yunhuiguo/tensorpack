@@ -50,15 +50,6 @@ class Connect(object):
         """
         return self._output
 
-    def sensors_list(self):
-        """
-        Equivalent to ``self.__call__()``.
-
-        Returns:
-            tf.Tensor: the underlying wrapped tensor.
-        """
-        return self._sensor_list
-
     def print_sensor_list(self):
         """
         Print the underlying tensor and return self. Can be useful to get the
