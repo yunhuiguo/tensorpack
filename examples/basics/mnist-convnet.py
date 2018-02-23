@@ -66,7 +66,7 @@ class Model(ModelDesc):
               .FullyConnected('fc3', 10, activation=tf.identity)())
 
 
-        logits = (Connect('cloud', [sensor1, sensor2])
+        logits = (Connect('cloud', [sensor1, sensor2], "concat")
                   .FullyConnected('fc4', 512, activation=tf.nn.relu)
                   .FullyConnected('fc5', 10, activation=tf.identity)())
 
@@ -112,7 +112,7 @@ class Model(ModelDesc):
 
 def get_data():
     train = BatchData(dataset.Mnist('train'), 128)
-    
+
     test = BatchData(dataset.Mnist('test'), 256, remainder=True)
     train = PrintData(train)
 
