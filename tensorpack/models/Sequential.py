@@ -31,7 +31,7 @@ class Sequential(object):
                     return Sequential(o)
                 return f
 
-    def __init__(self, name, tensor = None):
+    def __init__(self, name, tensor):
         """
         Args:
             tensor (tf.Tensor): the tensor to wrap
