@@ -24,10 +24,11 @@ class Connect(object):
         """
         self._sensor_list = sensors_list
         self.name = name
-        self._output = self.connect_sensors()
         print "\n\n"
         print "success"
         print "\n\n"
+
+        self._output = self.connect_sensors()
 
     def connect_sensors(self, method = "inner_product"):
         outputs = []
