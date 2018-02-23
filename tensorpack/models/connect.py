@@ -25,6 +25,9 @@ class Connect(object):
         self._sensor_list = sensors_list
         self.name = name
         self._output = self.connect_sensors()
+        print "\n\n"
+        print "success"
+        print "\n\n"
 
     def connect_sensors(self, method = "inner_product"):
         outputs = []
@@ -42,9 +45,7 @@ class Connect(object):
                 elif method == "concat":
                     outputs.append(sensor_output)
         outputs = tf.concat(outputs, axis=1)
-        print "\n\n"
-        print "success"
-        print "\n\n"
+ 
         return outputs
 
 
