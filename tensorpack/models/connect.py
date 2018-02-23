@@ -42,7 +42,8 @@ class Connect(object):
                 elif method == "concat":
                     outputs.append(sensor_output)
         outputs = tf.concat(outputs, axis=1)
-        return Sequential(outputs)
+
+        return Sequential(outputs)()
 
 
     def __getattr__(self, layer_name):

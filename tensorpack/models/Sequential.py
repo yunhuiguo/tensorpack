@@ -31,13 +31,12 @@ class Sequential(object):
                     return Sequential(o)
                 return f
 
-    def __init__(self, name, tensor):
+    def __init__(self, tensor):
         """
         Args:
             tensor (tf.Tensor): the tensor to wrap
         """
         self._t = tensor
-        self.name = name
 
     def __getattr__(self, layer_name):
         layer = get_registered_layer(layer_name)
