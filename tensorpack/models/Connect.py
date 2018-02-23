@@ -30,7 +30,7 @@ class Connect(object):
         print "\n\n"
      
         for sensor_idx, sensor_output in enumerate(self.sensors_list):
-        	output = FullyConnected(sensor_output, sensor_output.shape[1], activation=tf.identity)
+            output = FullyConnected(sensor_output, sensor_output.shape[1], activation=tf.identity)
             outputs.append(output)
 
         outputs = tf.concat(outputs, axis=1)
