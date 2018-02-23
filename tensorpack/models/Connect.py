@@ -49,7 +49,7 @@ class Connect(object):
             obj = self._output.__getattr__(layer_name)
             return obj(name, *args, **kwargs)
 
-        return layers_func
+        return layer_funcs
 
     def __call__(self):
         """
