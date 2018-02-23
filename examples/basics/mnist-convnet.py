@@ -113,6 +113,9 @@ def get_data():
 
 def get_config():
     dataset_train, dataset_test = get_data()
+    print "ok"
+    print dataset_train.size()
+    print "\n\n"
     # How many iterations you want in each epoch.
     # This is the default value, don't actually need to set it in the config
     steps_per_epoch = dataset_train.size()
