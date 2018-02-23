@@ -20,16 +20,23 @@ class Connect(object):
         Args:
             tensor (tf.Tensor): the tensor to wrap
         """
-        self._sensor_list = sensors_list
-        print(type(self._sensor_list))
+        self._sensors_list = sensors_list
+        print(type(self._sensors_list))
         self.name = name
         self._output = self.connect_sensors()
 
     def connect_sensors(self, method = "inner_product"):
         outputs = []
-        for sensor_idx, sensor_output in enumerate(self._sensor_list):
-            output = FullyConnected(sensor_output, sensor_output.shape[1], activation=tf.identity)
-            outputs.append(output)
+        for sensor_idx, sensor in enumerate(sensors):
+            with tf.variable_scope("connect_sensor_" + str(sensor_idx)):
+                sensor_output = sensor.build_layers()
+                n_input = int(sensor_output.shape[1])
+
+                if method == "inner_product":
+                    w = tf.get_variable("w_"+str(sensor_idx), [n_input, 1],
+                        initializer=self.initializer())
+                    output = tf.matmul(sensor_output, w)
+                    outputs.append(output)
 
         outputs = tf.concat(outputs, axis=1)
         return Sequential(outputs)
