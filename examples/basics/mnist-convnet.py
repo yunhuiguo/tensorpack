@@ -44,9 +44,8 @@ class Model(ModelDesc):
         and define self.cost at the end"""
 
         # inputs contains a list of input variables defined above
-        image1, image2, label = inputs
+        input_from_sensor1, input_from_sensor2, label = inputs
  
-
         # In tensorflow, inputs to convolution function are assumed to be
         # NHWC. Add a single channel here.
         #image = tf.expand_dims(image, 3)
@@ -55,29 +54,25 @@ class Model(ModelDesc):
         # The context manager `argscope` sets the default option for all the layers under
         # this context. Here we use 32 channel convolution with shape 3x3
 
+        sensor1 = Sequential(input_from_sensor1) \
+                .FullyConnected('fc0', 512, activation=tf.nn.relu) \
+                .FullyConnected('fc1', 10, activation=tf.identity)() 
 
-        sensor1 = (Sequential(image1)
-              .FullyConnected('fc0', 512, activation=tf.nn.relu)
-              .FullyConnected('fc1', 10, activation=tf.identity)())
+        sensor2 = Sequential(input_from_sensor2) \
+                .FullyConnected('fc2', 512, activation=tf.nn.relu) \
+                .FullyConnected('fc3', 10, activation=tf.identity)()
 
+        output = Connect('cloud', [sensor1, sensor2], "inner_product") \
+                .FullyConnected('fc4', 512, activation=tf.nn.relu) \
+                .FullyConnected('fc5', 10, activation=tf.identity)()
 
-        sensor2 = (Sequential(image2)
-              .FullyConnected('fc2', 512, activation=tf.nn.relu)
-              .FullyConnected('fc3', 10, activation=tf.identity)())
-
-
-        logits = (Connect('cloud', [sensor1, sensor2], "concat")
-                  .FullyConnected('fc4', 512, activation=tf.nn.relu)
-                  .FullyConnected('fc5', 10, activation=tf.identity)())
-
-
-        tf.nn.softmax(logits, name='prob')   # a Bx10 with probabilities
+        tf.nn.softmax(output, name='prob')   # a Bx10 with probabilities
 
         # a vector of length B with loss of each sample
-        cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
+        cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=output, labels=label)
         cost = tf.reduce_mean(cost, name='cross_entropy_loss')  # the average cross-entropy loss
 
-        correct = tf.cast(tf.nn.in_top_k(logits, label, 1), tf.float32, name='correct')
+        correct = tf.cast(tf.nn.in_top_k(output, label, 1), tf.float32, name='correct')
         accuracy = tf.reduce_mean(correct, name='accuracy')
 
         # This will monitor training error (in a moving_average fashion):
@@ -92,7 +87,9 @@ class Model(ModelDesc):
         wd_cost = tf.multiply(1e-5,
                               regularize_cost('fc.*/W', tf.nn.l2_loss),
                               name='regularize_loss')
+
         self.cost = tf.add_n([wd_cost, cost], name='total_cost')
+
         summary.add_moving_summary(cost, wd_cost, self.cost)
 
         # monitor histogram of all weight (of conv and fc layers) in tensorboard
@@ -112,7 +109,6 @@ class Model(ModelDesc):
 
 def get_data():
     train = BatchData(dataset.Mnist('train'), 128)
-
     test = BatchData(dataset.Mnist('test'), 256, remainder=True)
     train = PrintData(train)
 
@@ -120,7 +116,6 @@ def get_data():
 
 
 def get_config():
-
     dataset_train, dataset_test = get_data()
     # How many iterations you want in each epoch.
     # This is the default value, don't actually need to set it in the config
@@ -141,7 +136,6 @@ def get_config():
         max_epoch=1,
     )
 
-
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
@@ -157,6 +151,7 @@ if __name__ == '__main__':
     config = get_config()
     if args.load:
         config.session_init = SaverRestore(args.load)
+
     # SimpleTrainer is slow, this is just a demo.
     # You can use QueueInputTrainer instead
-    launch_train_with_config(config, SimpleTrainer())
+    launch_train_with_config(config, QueueInputTrainer())

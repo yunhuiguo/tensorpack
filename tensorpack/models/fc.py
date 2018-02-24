@@ -10,7 +10,6 @@ from ..tfutils import symbolic_functions as symbf
 
 __all__ = ['FullyConnected']
 
-
 @layer_register(log_shape=True)
 @convert_to_tflayer_args(
     args_names=['units'],
