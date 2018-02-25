@@ -6,10 +6,6 @@ import os
 import argparse
 import tensorflow as tf
 import numpy as np
-"""
-MNIST ConvNet example.
-about 0.6% validation error after 30 epochs.
-"""
 
 # Just import everything into current namespace
 from tensorpack import *
@@ -38,7 +34,6 @@ class Model(ModelDesc):
         return [InputDesc(tf.float32, (None, IMAGE_SIZE), 'input1'),
                 InputDesc(tf.float32, (None, IMAGE_SIZE), 'input2'),
                 InputDesc(tf.float32, (None, IMAGE_SIZE), 'input3'),
-
                 InputDesc(tf.int32, (None,), 'label')]
 
     def _build_graph(self, inputs):
@@ -46,7 +41,7 @@ class Model(ModelDesc):
         and define self.cost at the end"""
 
         # inputs contains a list of input variables defined above
-        image1, image2, images3, label = inputs
+        input_from_sensor1, input_from_sensor2, input_from_sensor3, label = inputs
  
 
         # In tensorflow, inputs to convolution function are assumed to be
@@ -57,24 +52,24 @@ class Model(ModelDesc):
         # The context manager `argscope` sets the default option for all the layers under
         # this context. Here we use 32 channel convolution with shape 3x3
 
-        sensor1 = (Sequential(image1)
-              .FullyConnected('fc0', 512, activation=tf.nn.relu)
-              .FullyConnected('fc1', 10, activation=tf.identity)())
+        output_from_sensor1 = Sequential(input_from_sensor11) \
+              .FullyConnected('fc0', 512, activation=tf.nn.relu) \
+              .FullyConnected('fc1', 10, activation=tf.identity)()
 
 
-        sensor2 = (Sequential(image2)
-              .FullyConnected('fc2', 512, activation=tf.nn.relu)
-              .FullyConnected('fc3', 10, activation=tf.identity)())
+        output_from_sensor2 = Sequential(input_from_sensor2) \
+              .FullyConnected('fc2', 512, activation=tf.nn.relu) \
+              .FullyConnected('fc3', 10, activation=tf.identity)()
 
 
-        sensor3 = (Sequential(image3)
-              .FullyConnected('fc4', 512, activation=tf.nn.relu)
-              .FullyConnected('fc5', 10, activation=tf.identity)())
+        output_from_sensor3 = Sequential(input_from_sensor3) \
+              .FullyConnected('fc4', 512, activation=tf.nn.relu) \
+              .FullyConnected('fc5', 10, activation=tf.identity)()
 
 
-        logits = (Connect('cloud', [sensor1, sensor2, sensor3])
-                  .FullyConnected('fc6', 512, activation=tf.nn.relu)
-                  .FullyConnected('fc7', 10, activation=tf.identity)())
+        logits = Connect('cloud', [output_from_sensor1, output_from_sensor2, output_from_sensor3]) \
+                  .FullyConnected('fc6', 512, activation=tf.nn.relu) \
+                  .FullyConnected('fc7', 10, activation=tf.identity)()
 
 
         tf.nn.softmax(logits, name='prob')   # a Bx10 with probabilities
@@ -191,15 +186,15 @@ class MyDataFlow(RNGDataFlow):
         train_data = train_data[idx1[0]]
         train_labels = train_labels[idx1[0]]
 
-        i = 1
+        i = 2
         test_data = data_list[i]
         test_labels = label_list[i]
 
         train_data = np.concatenate(data_list[0:i] + data_list[i+1:])
         train_labels = np.concatenate(label_list[0:i] + label_list[i+1:])
 
-        train_labels =  train_labels.reshape(train_labels.shape[0],1)
-        test_labels = test_labels.reshape(test_labels.shape[0],1)
+        #train_labels =  train_labels.reshape(train_labels.shape[0],1)
+        #test_labels = test_labels.reshape(test_labels.shape[0],1)
 
 
         idx1 = np.nonzero(train_labels != 99)
@@ -209,14 +204,14 @@ class MyDataFlow(RNGDataFlow):
         test_data = test_data[idx2[0]]
         test_labels = test_labels[idx2[0]]
 
-        one_hot_train_labels = np.eye(5)[train_labels].reshape(train_labels.shape[0], 5)
-        one_hot_test_labels = np.eye(5)[test_labels].reshape(test_labels.shape[0], 5)
+        #one_hot_train_labels = np.eye(5)[train_labels].reshape(train_labels.shape[0], 5)
+        #one_hot_test_labels = np.eye(5)[test_labels].reshape(test_labels.shape[0], 5)
 
 
         if self.train_or_test == 'train':
-            self.images, self.labels = train_data, one_hot_train_labels
+            self.images, self.labels = train_data, train_labels
         else:
-            self.images, self.labels = test_data, one_hot_test_labels
+            self.images, self.labels = test_data, test_labels
 
 
     def size(self):
@@ -227,16 +222,15 @@ class MyDataFlow(RNGDataFlow):
         if self.shuffle:
             self.rng.shuffle(idxs)
         for k in idxs:
-            #img = self.images[k].reshape((28, 28))
-            img = self.images[k].reshape((784,))
+            img = self.images[k].reshape((36,))
 
-            hand = self.images[:,0:12]
-            chest = self.images[:, 12:24]
-            ankle = self.images[:,24:]
+            hand = img[0:12]
+            chest = img[12:24]
+            ankle = img[24:]
 
             label = self.labels[k]
 
-            yield [hand, chest, ankle]
+            yield [hand, chest, ankle, label]
 
 
 

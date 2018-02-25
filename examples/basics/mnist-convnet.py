@@ -44,7 +44,7 @@ class Model(ModelDesc):
         and define self.cost at the end"""
 
         # inputs contains a list of input variables defined above
-        input_from_sensor1, input_from_sensor2, label = inputs
+        input_from_sensor1, input_from_sensor2, input_from_sensor2, label = inputs
  
         # In tensorflow, inputs to convolution function are assumed to be
         # NHWC. Add a single channel here.
