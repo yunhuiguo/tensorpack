@@ -72,7 +72,6 @@ class Model(ModelDesc):
               .FullyConnected('fc5', 10, activation=tf.identity)())
 
 
-
         logits = (Connect('cloud', [sensor1, sensor2, sensor3])
                   .FullyConnected('fc6', 512, activation=tf.nn.relu)
                   .FullyConnected('fc7', 10, activation=tf.identity)())
