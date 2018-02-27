@@ -24,7 +24,7 @@ class Sequential(object):
 
             ret = getattr(self._mod, name)
             if isinstance(ret, ModuleType):
-                return Sequential._TFModuleFunc(ret, self._t)
+                return Sequential._TFModuleFunc(self._name, ret, self._t)
             else:
                 # assume to be a tf function
                 def f(*args, **kwargs):
