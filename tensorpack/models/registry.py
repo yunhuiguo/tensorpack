@@ -18,12 +18,12 @@ _LAYER_REGISTRY = {}
 
 __all__ = ['layer_register']
 
-
 def _register(name, func):
     if name in _LAYER_REGISTRY:
         raise ValueError("Layer named {} is already registered!".format(name))
     if name in ['tf']:
         raise ValueError(logger.error("A layer cannot be named {}".format(name)))
+
     _LAYER_REGISTRY[name] = func
 
 
@@ -96,6 +96,7 @@ def layer_register(
                 else:
                     inputs = args[0]
                     name = None
+
             if not (isinstance(inputs, (tf.Tensor, tf.Variable)) or
                     (isinstance(inputs, (list, tuple)) and
                         isinstance(inputs[0], (tf.Tensor, tf.Variable)))):

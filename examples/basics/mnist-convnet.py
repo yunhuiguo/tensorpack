@@ -40,25 +40,28 @@ class Model(ModelDesc):
                 InputDesc(tf.int32, (None,), 'label')]
 
     def _build_graph(self, inputs):
+
+
+  
         """This function should build the model which takes the input variables
         and define self.cost at the end"""
 
-        # inputs contains a list of input variables defined above
-        input_from_sensor1, input_from_sensor2, input_from_sensor2, label = inputs
- 
-        # In tensorflow, inputs to convolution function are assumed to be
-        # NHWC. Add a single channel here.
-        #image = tf.expand_dims(image, 3)
+            # inputs contains a list of input variables defined above
+        input_from_sensor1, input_from_sensor2, label = inputs
+     
+            # In tensorflow, inputs to convolution function are assumed to be
+            # NHWC. Add a single channel here.
+            #image = tf.expand_dims(image, 3)
 
-        #image = image * 2 - 1   # center the pixels values at zero
-        # The context manager `argscope` sets the default option for all the layers under
-        # this context. Here we use 32 channel convolution with shape 3x3
+            #image = image * 2 - 1   # center the pixels values at zero
+            # The context manager `argscope` sets the default option for all the layers under
+            # this context. Here we use 32 channel convolution with shape 3x3
 
-        sensor1 = Sequential(input_from_sensor1) \
-                .FullyConnected('fc0', 512, activation=tf.nn.relu) \
+        sensor1 = Sequential("sensor1", input_from_sensor1) \
+                .FullyConnected('fc100', 512, activation=tf.nn.relu) \
                 .FullyConnected('fc1', 10, activation=tf.identity)() 
 
-        sensor2 = Sequential(input_from_sensor2) \
+        sensor2 = Sequential("sensor2", input_from_sensor2) \
                 .FullyConnected('fc2', 512, activation=tf.nn.relu) \
                 .FullyConnected('fc3', 10, activation=tf.identity)()
 
@@ -67,6 +70,12 @@ class Model(ModelDesc):
                 .FullyConnected('fc5', 10, activation=tf.identity)()
 
         tf.nn.softmax(output, name='prob')   # a Bx10 with probabilities
+
+        g = tf.get_default_graph()
+
+        for v in g.as_graph_def().node:
+            print v.name
+
 
         # a vector of length B with loss of each sample
         cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=output, labels=label)
