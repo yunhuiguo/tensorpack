@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # File: Sequential.py
 
-
+import tensorflow as tf
 import six
 from types import ModuleType
 from .registry import get_registered_layer
