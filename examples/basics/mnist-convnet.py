@@ -138,8 +138,8 @@ def get_config():
         model= Model(),
         dataflow= dataset_train,  # the DataFlow instance for training
         callbacks=[
-            ModelSaver(),   # save the model after every epoch
-            MaxSaver('validation_accuracy'),  # save the model with highest accuracy (prefix 'validation_')
+            #ModelSaver(),   # save the model after every epoch
+            #MaxSaver('validation_accuracy'),  # save the model with highest accuracy (prefix 'validation_')
             InferenceRunner(    # run inference(for validation) after every epoch
                 dataset_test,   # the DataFlow instance used for validation
                 ScalarStats(['cross_entropy_loss', 'accuracy'])),

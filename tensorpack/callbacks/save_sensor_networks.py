@@ -12,7 +12,6 @@ from ..tfutils.common import get_tf_version_number
 __all__ = ['SaveSensorNetworks']
 
 
-
 def freeze_graph(sess):
     # convert_variables_to_constants(sess, input_graph_def, output_node_names, variable_names_whitelist=None)
     with gfile.FastGFile("./tmp/" + "graph.pb", 'rb') as f:
@@ -27,16 +26,11 @@ def freeze_graph(sess):
     return frozen_graph_def
            
 
-
 saver.save(sess, "./tmp/model", write_meta_graph=True, global_step=1)
 with open("./tmp/" + "graph.pb", 'wb') as f:
     f.write(sess.graph_def.SerializeToString())
 
-
-
 freeze_graph(sess)
-
-
 
   g = tf.Graph()
     with g.as_default():
