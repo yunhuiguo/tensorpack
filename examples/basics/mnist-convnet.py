@@ -57,12 +57,11 @@ class Model(ModelDesc):
             # The context manager `argscope` sets the default option for all the layers under
             # this context. Here we use 32 channel convolution with shape 3x3
 
-        sensor1 = Sequential("sensor1", input_from_sensor1) \
+        sensor1 = Sequential(input_from_sensor1) \
                 .FullyConnected('fc100', 512, activation=tf.nn.relu) \
-                .tf.nn.relu() \
                 .FullyConnected('fc1', 10, activation=tf.identity)() 
 
-        sensor2 = Sequential("sensor2", input_from_sensor2) \
+        sensor2 = Sequential(input_from_sensor2) \
                 .FullyConnected('fc2', 512, activation=tf.nn.relu) \
                 .FullyConnected('fc3', 10, activation=tf.identity)()
 
@@ -70,12 +69,15 @@ class Model(ModelDesc):
                 .FullyConnected('fc4', 512, activation=tf.nn.relu) \
                 .FullyConnected('fc5', 10, activation=tf.identity)()
 
+        print "output type"
+        print type(output)
+        print "\n"
+
         tf.nn.softmax(output, name='prob')   # a Bx10 with probabilities
 
-        g = tf.get_default_graph()
-
-        for v in g.as_graph_def().node:
-            print v.name
+        #g = tf.get_default_graph()
+        #for v in g.as_graph_def().node:
+        #    print v.name
 
 
         # a vector of length B with loss of each sample
