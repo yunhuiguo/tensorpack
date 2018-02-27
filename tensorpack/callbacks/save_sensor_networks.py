@@ -8,7 +8,7 @@ import os
 from .base import Callback
 from ..utils import logger
 from ..tfutils.common import get_tf_version_number
-
+'''
 __all__ = ['SaveSensorNetworks']
 
 
@@ -121,3 +121,4 @@ class SaveSensorNetworks(Callback):
         except (OSError, IOError, tf.errors.PermissionDeniedError,
                 tf.errors.ResourceExhaustedError):   # disk error sometimes.. just ignore it
             logger.exception("Exception in ModelSaver!")
+'''
