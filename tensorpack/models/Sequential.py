@@ -13,7 +13,6 @@ class Sequential(object):
     """ A simple wrapper to easily create "linear" graph,
         consisting of layers / symbolic functions with only one input & output.
     """
-            return Sequential._TFModuleFunc(layer, self._t)
 
     class _TFModuleFunc(object):
         def __init__(self, name, mod, tensor):
@@ -22,15 +21,18 @@ class Sequential(object):
             self._name = name
 
         def __getattr__(self, name):
-            ret = getattr(self._mod, name)
-            if isinstance(ret, ModuleType):
-                return Sequential._TFModuleFunc(self._name, ret, self._t)
-            else:
-                # assume to be a tf function
-                def f(*args, **kwargs):
-                    o = ret(self._t, *args, **kwargs)
-                    return Sequential(self._name, o)
-                return f
+
+            with tf.variable_scope(self._name):
+
+                ret = getattr(self._mod, name)
+                if isinstance(ret, ModuleType):
+                    return Sequential._TFModuleFunc(self._name, ret, self._t)
+                else:
+                    # assume to be a tf function
+                    def f(*args, **kwargs):
+                        o = ret(self._t, *args, **kwargs)
+                        return Sequential(self._name, o)
+                    return f
 
     def __init__(self, name, tensor):
         """
