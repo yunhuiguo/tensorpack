@@ -2,10 +2,12 @@
 # -*- coding: utf-8 -*-
 # File: Sequential.py
 
+import tensorflow as tf
 
 import six
 from types import ModuleType
 from .registry import get_registered_layer
+
 
 __all__ = ['Sequential']
 
@@ -39,7 +41,6 @@ class Sequential(object):
         self._name = name
  
     def __getattr__(self, layer_name):
-        
         with tf.variable_scope(self._name):
             layer = get_registered_layer(layer_name)
 
