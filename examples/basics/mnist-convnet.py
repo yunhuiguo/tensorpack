@@ -58,16 +58,16 @@ class Model(ModelDesc):
             # this context. Here we use 32 channel convolution with shape 3x3
 
         sensor1 = Sequential('sensor1', input_from_sensor1) \
-                .FullyConnected('fc100', 512, activation=tf.nn.relu) \
+                .FullyConnected('fc0', 512, activation=tf.nn.relu) \
                 .FullyConnected('fc1', 10, activation=tf.identity)() 
 
-        sensor2 = Sequential('sensor1', input_from_sensor2) \
-                .FullyConnected('fc2', 512, activation=tf.nn.relu) \
-                .FullyConnected('fc3', 10, activation=tf.identity)()
+        sensor2 = Sequential('sensor2', input_from_sensor2) \
+                .FullyConnected('fc0', 512, activation=tf.nn.relu) \
+                .FullyConnected('fc1', 10, activation=tf.identity)()
 
         output = Connect('cloud', [sensor1, sensor2], "inner_product") \
-                .FullyConnected('fc4', 512, activation=tf.nn.relu) \
-                .FullyConnected('fc5', 10, activation=tf.identity)()
+                .FullyConnected('fc0', 512, activation=tf.nn.relu) \
+                .FullyConnected('fc1', 10, activation=tf.identity)()
 
         print "output type"
         print type(output)
