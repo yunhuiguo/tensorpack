@@ -52,24 +52,28 @@ class Model(ModelDesc):
         # The context manager `argscope` sets the default option for all the layers under
         # this context. Here we use 32 channel convolution with shape 3x3
 
-        output_from_sensor1 = Sequential(input_from_sensor11) \
-              .FullyConnected('fc0', 512, activation=tf.nn.relu) \
+
+
+        sensor1 = Sequential(input_from_sensor1) 
+              .FullyConnected('fc0', 512, activation=tf.nn.relu) 
               .FullyConnected('fc1', 10, activation=tf.identity)()
 
 
-        output_from_sensor2 = Sequential(input_from_sensor2) \
-              .FullyConnected('fc2', 512, activation=tf.nn.relu) \
+        sensor2 = Sequential(input_from_sensor2) 
+              .FullyConnected('fc2', 512, activation=tf.nn.relu) 
               .FullyConnected('fc3', 10, activation=tf.identity)()
 
 
-        output_from_sensor3 = Sequential(input_from_sensor3) \
-              .FullyConnected('fc4', 512, activation=tf.nn.relu) \
+        sensor3 = Sequential(input_from_sensor3) 
+              .FullyConnected('fc4', 512, activation=tf.nn.relu) 
               .FullyConnected('fc5', 10, activation=tf.identity)()
 
 
-        logits = Connect('cloud', [output_from_sensor1, output_from_sensor2, output_from_sensor3]) \
-                  .FullyConnected('fc6', 512, activation=tf.nn.relu) \
+        output = Connect('cloud', [sensor1, sensors2, sensor3]) 
+                  .FullyConnected('fc6', 512, activation=tf.nn.relu) 
                   .FullyConnected('fc7', 10, activation=tf.identity)()
+
+
 
 
         tf.nn.softmax(logits, name='prob')   # a Bx10 with probabilities
