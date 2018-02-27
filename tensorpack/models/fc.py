@@ -46,6 +46,7 @@ def FullyConnected(
             kernel_regularizer=kernel_regularizer,
             bias_regularizer=bias_regularizer,
             activity_regularizer=activity_regularizer)
+        
         ret = layer.apply(inputs, scope=tf.get_variable_scope())
 
     ret.variables = VariableHolder(W=layer.kernel)

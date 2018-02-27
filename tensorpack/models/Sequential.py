@@ -22,17 +22,15 @@ class Sequential(object):
 
         def __getattr__(self, name):
 
-            with tf.variable_scope(self._name):
-
-                ret = getattr(self._mod, name)
-                if isinstance(ret, ModuleType):
-                    return Sequential._TFModuleFunc(self._name, ret, self._t)
-                else:
-                    # assume to be a tf function
-                    def f(*args, **kwargs):
-                        o = ret(self._t, *args, **kwargs)
-                        return Sequential(self._name, o)
-                    return f
+            ret = getattr(self._mod, name)
+            if isinstance(ret, ModuleType):
+                return Sequential._TFModuleFunc(ret, self._t)
+            else:
+                # assume to be a tf function
+                def f(*args, **kwargs):
+                    o = ret(self._t, *args, **kwargs)
+                    return Sequential(self._name, o)
+                return f
 
     def __init__(self, name, tensor):
         """
@@ -43,36 +41,34 @@ class Sequential(object):
         self._name = name
  
     def __getattr__(self, layer_name):
+        
+        layer = get_registered_layer(layer_name)
 
-        with tf.variable_scope(self._name):
-
-            layer = get_registered_layer(layer_name)
-
-            if layer is not None:
-                # this is a registered tensorpack layer
-                # parse arguments by tensorpack model convention
-                if layer.use_scope:
-                    def layer_func(name, *args, **kwargs):
-                        if self._t != None:
-                            ret = layer(name, self._t, *args, **kwargs)
-                            return Sequential(self._name, ret)
-                else:
-                    def layer_func(*args, **kwargs):
-                        if len(args) and isinstance(args[0], six.string_types):
-                            name, args = args[0], args[1:]
-                            ret = layer(name, self._t, *args, **kwargs)
-                        else:
-                            ret = layer(self._t, *args, **kwargs)
+        if layer is not None:
+            # this is a registered tensorpack layer
+            # parse arguments by tensorpack model convention
+            if layer.use_scope:
+                def layer_func(name, *args, **kwargs):
+                    if self._t != None:
+                        ret = layer(self._name + "_" + name, self._t, *args, **kwargs)
                         return Sequential(self._name, ret)
-                return layer_func
             else:
-                assert layer_name == 'tf', \
-                    "Calling Sequential.{}:" \
-                    " neither a layer nor 'tf'! " \
-                    "Did you forget to extract tensor from Sequential?".format(layer_name)
-                import tensorflow as layer  # noqa
-                assert isinstance(layer, ModuleType), layer
-                return Sequential._TFModuleFunc(self._name, layer, self._t)
+                def layer_func(*args, **kwargs):
+                    if len(args) and isinstance(args[0], six.string_types):
+                        name, args = args[0], args[1:]
+                        ret = layer(self._name + "_" + name, self._t, *args, **kwargs)
+                    else:
+                        ret = layer(self._t, *args, **kwargs)
+                    return Sequential(self._name, ret)
+            return layer_func
+        else:
+            assert layer_name == 'tf', \
+                "Calling Sequential.{}:" \
+                " neither a layer nor 'tf'! " \
+                "Did you forget to extract tensor from Sequential?".format(layer_name)
+            import tensorflow as layer  # noqa
+            assert isinstance(layer, ModuleType), layer
+            return Sequential._TFModuleFunc(self._name, layer, self._t)
     
 
     def apply(self, func, *args, **kwargs):

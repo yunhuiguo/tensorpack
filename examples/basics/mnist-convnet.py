@@ -75,9 +75,9 @@ class Model(ModelDesc):
 
         tf.nn.softmax(output, name='prob')   # a Bx10 with probabilities
 
-        #g = tf.get_default_graph()
-        #for v in g.as_graph_def().node:
-        #    print v.name
+        g = tf.get_default_graph()
+        for v in g.as_graph_def().node:
+            print v.name
 
 
         # a vector of length B with loss of each sample
