@@ -1,6 +1,5 @@
 # -*- coding: UTF-8 -*-
-# File: saver.py
-
+# File: save_sensor_networks.py
 
 import tensorflow as tf
 from datetime import datetime
@@ -10,9 +9,9 @@ from .base import Callback
 from ..utils import logger
 from ..tfutils.common import get_tf_version_number
 
-__all__ = ['ModelSaver', 'MinSaver', 'MaxSaver']
+__all__ = ['SaveSensorNetworks']
 
-class ModelSaver(Callback):
+class SaveSensorNetworks(Callback):
     """
     Save the model once triggered.
     """
@@ -28,6 +27,8 @@ class ModelSaver(Callback):
             checkpoint_dir (str): Defaults to ``logger.get_logger_dir()``.
             var_collections (str or list of str): collection of the variables (or list of collections) to save.
         """
+
+        
         self._max_to_keep = max_to_keep
         self._keep_every_n_hours = keep_checkpoint_every_n_hours
 
@@ -84,85 +85,3 @@ class ModelSaver(Callback):
         except (OSError, IOError, tf.errors.PermissionDeniedError,
                 tf.errors.ResourceExhaustedError):   # disk error sometimes.. just ignore it
             logger.exception("Exception in ModelSaver!")
-
-
-class MinSaver(Callback):
-    """
-    Separately save the model with minimum value of some statistics.
-    """
-    def __init__(self, monitor_stat, reverse=False, filename=None, checkpoint_dir=None):
-        """
-        Args:
-            monitor_stat(str): the name of the statistics.
-            reverse (bool): if True, will save the maximum.
-            filename (str): the name for the saved model.
-                Defaults to ``min-{monitor_stat}.tfmodel``.
-        Example:
-            Save the model with minimum validation error to
-            "min-val-error.tfmodel":
-            .. code-block:: python
-                MinSaver('val-error')
-        Note:
-            It assumes that :class:`ModelSaver` is used with
-            the same ``checkpoint_dir``. And it will save
-            the model to that directory as well.
-            The default for both :class:`ModelSaver` and :class:`MinSaver`
-            is ``checkpoint_dir=logger.get_logger_dir()``
-
-        """
-        self.monitor_stat = monitor_stat
-        self.reverse = reverse
-        self.filename = filename
-        self.min = None
-        self.checkpoint_dir = checkpoint_dir
-        if self.checkpoint_dir is None:
-            self.checkpoint_dir = logger.get_logger_dir()
-
-    def _get_stat(self):
-        try:
-            v = self.trainer.monitors.get_latest(self.monitor_stat)
-        except KeyError:
-            v = None
-        return v
-
-    def _need_save(self):
-        v = self._get_stat()
-        if not v:
-            return False
-        return v > self.min if self.reverse else v < self.min
-
-    def _trigger(self):
-        if self.min is None or self._need_save():
-            self.min = self._get_stat()
-            if self.min:
-                self._save()
-
-    def _save(self):
-        ckpt = tf.train.get_checkpoint_state(self.checkpoint_dir)
-        if ckpt is None:
-            raise RuntimeError(
-                "Cannot find a checkpoint state. Do you forget to use ModelSaver?")
-        path = ckpt.model_checkpoint_path
-
-        newname = os.path.join(self.checkpoint_dir,
-                               self.filename or
-                               ('max-' + self.monitor_stat if self.reverse else 'min-' + self.monitor_stat))
-        files_to_copy = tf.gfile.Glob(path + '*')
-        for file_to_copy in files_to_copy:
-            tf.gfile.Copy(file_to_copy, file_to_copy.replace(path, newname), overwrite=True)
-        logger.info("Model with {} '{}' saved.".format(
-            'maximum' if self.reverse else 'minimum', self.monitor_stat))
-
-
-class MaxSaver(MinSaver):
-    """
-    Separately save the model with maximum value of some statistics.
-    """
-    def __init__(self, monitor_stat, filename=None, checkpoint_dir=None):
-        """
-        Args:
-            monitor_stat(str): the name of the statistics.
-            filename (str): the name for the saved model.
-                Defaults to ``max-{monitor_stat}.tfmodel``.
-        """
-        super(MaxSaver, self).__init__(monitor_stat, True, filename=filename, checkpoint_dir=checkpoint_dir)
