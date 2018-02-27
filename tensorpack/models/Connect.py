@@ -21,25 +21,25 @@ class Connect(object):
             tensors_list: a list of sensors to connect
         """
         self._sensors_list = sensors_list
-        self.name = name
-        self.connected_method = connected_method
+        self._name = name
+        self._connected_method = connected_method
         self._output = self.connect_sensors()
 
     def connect_sensors(self):
         outputs = []
         for sensor_idx, sensor_output in enumerate(self._sensors_list):
-            with tf.variable_scope("connect_sensor_" + str(sensor_idx)):
+            with tf.variable_scope(self._name + "\connect_sensor_" + str(sensor_idx)):
                 n_input = int(sensor_output.shape[1])
-                if self.connected_method == "inner_product":
+                if self._connected_method == "inner_product":
                     w = tf.get_variable("w_"+str(sensor_idx), [n_input, 1],
                         initializer=tf.contrib.layers.variance_scaling_initializer(2.0))
                     output = tf.matmul(sensor_output, w)
                     outputs.append(output)
-                elif self.connected_method == "concat":
+                elif self._connected_method == "concat":
                     outputs = self._sensors_list
 
         outputs = tf.concat(outputs, axis=1)
-        return Sequential(outputs)
+        return Sequential(self._name, outputs)
 
     def __getattr__(self, layer_name):
 
