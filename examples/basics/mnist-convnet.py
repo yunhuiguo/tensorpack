@@ -59,6 +59,7 @@ class Model(ModelDesc):
 
         sensor1 = Sequential("sensor1", input_from_sensor1) \
                 .FullyConnected('fc100', 512, activation=tf.nn.relu) \
+                .tf.nn.relu() \
                 .FullyConnected('fc1', 10, activation=tf.identity)() 
 
         sensor2 = Sequential("sensor2", input_from_sensor2) \

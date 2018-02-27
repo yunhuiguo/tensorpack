@@ -2,14 +2,13 @@
 # -*- coding: utf-8 -*-
 # File: Sequential.py
 
-import tensorflow as tf
 
 import six
 from types import ModuleType
 from .registry import get_registered_layer
 
-
 __all__ = ['Sequential']
+
 
 class Sequential(object):
     """ A simple wrapper to easily create "linear" graph,
@@ -32,44 +31,42 @@ class Sequential(object):
                     return Sequential(o)
                 return f
 
-    def __init__(self, name, tensor):
+    def __init__(self,tensor):
         """
         Args:
             tensor (tf.Tensor): the tensor to wrap
         """
         self._t = tensor
-        self._name = name
  
     def __getattr__(self, layer_name):
-        with tf.variable_scope(self._name):
-            layer = get_registered_layer(layer_name)
+        layer = get_registered_layer(layer_name)
 
-            if layer is not None:
-                # this is a registered tensorpack layer
-                # parse arguments by tensorpack model convention
-                if layer.use_scope:
-                    def layer_func(name, *args, **kwargs):
-                        if self._t != None:
-                            ret = layer(name, self._t, *args, **kwargs)
-                            return Sequential(ret)
-                else:
-                    def layer_func(*args, **kwargs):
-                        if len(args) and isinstance(args[0], six.string_types):
-                            name, args = args[0], args[1:]
-                            ret = layer(name, self._t, *args, **kwargs)
-                        else:
-                            ret = layer(self._t, *args, **kwargs)
+        if layer is not None:
+            # this is a registered tensorpack layer
+            # parse arguments by tensorpack model convention
+            if layer.use_scope:
+                def layer_func(name, *args, **kwargs):
+                    if self._t != None:
+                        ret = layer(name, self._t, *args, **kwargs)
                         return Sequential(ret)
-                return layer_func
             else:
-                assert layer_name == 'tf', \
-                    "Calling Sequential.{}:" \
-                    " neither a layer nor 'tf'! " \
-                    "Did you forget to extract tensor from Sequential?".format(layer_name)
-                import tensorflow as layer  # noqa
-                assert isinstance(layer, ModuleType), layer
-                return Sequential._TFModuleFunc(layer, self._t)
-        
+                def layer_func(*args, **kwargs):
+                    if len(args) and isinstance(args[0], six.string_types):
+                        name, args = args[0], args[1:]
+                        ret = layer(name, self._t, *args, **kwargs)
+                    else:
+                        ret = layer(self._t, *args, **kwargs)
+                    return Sequential(ret)
+            return layer_func
+        else:
+            assert layer_name == 'tf', \
+                "Calling Sequential.{}:" \
+                " neither a layer nor 'tf'! " \
+                "Did you forget to extract tensor from Sequential?".format(layer_name)
+            import tensorflow as layer  # noqa
+            assert isinstance(layer, ModuleType), layer
+            return Sequential._TFModuleFunc(layer, self._t)
+    
     def apply(self, func, *args, **kwargs):
         """
         Apply a function on the wrapped tensor.
