@@ -78,7 +78,7 @@ class Sequential(object):
             Sequential: ``Sequential(func(self.tensor(), *args, **kwargs))``.
         """
         ret = func(self._t, *args, **kwargs)
-        return Sequential(ret)
+        return Sequential(self._t, ret)
 
     def apply2(self, func, *args, **kwargs):
         """
@@ -89,7 +89,7 @@ class Sequential(object):
             Sequential: ``Sequential(func(args[0], self.tensor(), *args[1:], **kwargs))``.
         """
         ret = func(args[0], self._t, *(args[1:]), **kwargs)
-        return Sequential(ret)
+        return Sequential(self._t, ret)
 
     def __call__(self):
         """
@@ -105,7 +105,7 @@ class Sequential(object):
         Returns:
             tf.Tensor: the underlying wrapped tensor.
         """
-        return self._t
+        return tf.identity(self._t, name= self._name + "_output") 
 
     def print_tensor(self):
         """
