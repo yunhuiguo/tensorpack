@@ -11,7 +11,7 @@ from ..tfutils.common import get_tf_version_number
 
 __all__ = ['SaveSensorNetworks']
 
-
+'''
 def freeze_graph(sess):
     # convert_variables_to_constants(sess, input_graph_def, output_node_names, variable_names_whitelist=None)
     with gfile.FastGFile("./tmp/" + "graph.pb", 'rb') as f:
@@ -121,3 +121,4 @@ class SaveSensorNetworks(Callback):
         except (OSError, IOError, tf.errors.PermissionDeniedError,
                 tf.errors.ResourceExhaustedError):   # disk error sometimes.. just ignore it
             logger.exception("Exception in ModelSaver!")
+'''
