@@ -40,8 +40,6 @@ class Model(ModelDesc):
                 InputDesc(tf.int32, (None,), 'label')]
 
     def _build_graph(self, inputs):
-
-
   
         """This function should build the model which takes the input variables
         and define self.cost at the end"""
@@ -69,16 +67,11 @@ class Model(ModelDesc):
                 .FullyConnected('fc0', 512, activation=tf.nn.relu) \
                 .FullyConnected('fc1', 10, activation=tf.identity)()
 
-        print "output type"
-        print type(output)
-        print "\n"
-
         tf.nn.softmax(output, name='prob')   # a Bx10 with probabilities
 
         g = tf.get_default_graph()
         for v in g.as_graph_def().node:
             print v.name
-
 
         # a vector of length B with loss of each sample
         cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=output, labels=label)

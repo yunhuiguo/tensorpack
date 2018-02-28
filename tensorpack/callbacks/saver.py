@@ -16,7 +16,6 @@ class ModelSaver(Callback):
     """
     Save the model once triggered.
     """
-
     def __init__(self, max_to_keep=10,
                  keep_checkpoint_every_n_hours=0.5,
                  checkpoint_dir=None,
