@@ -2,6 +2,7 @@
 train_log
 tensorpack/user_ops/obj
 *.npy
+.DS_Store
 *.npz
 *.caffemodel
 *.tfmodel
