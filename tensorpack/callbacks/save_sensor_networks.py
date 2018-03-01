@@ -1,9 +1,6 @@
 # -*- coding: UTF-8 -*-
 # File: save_sensor_networks.py
-
 import tensorflow as tf
-
-
 from datetime import datetime
 import os
 
@@ -69,10 +66,11 @@ class SaveSensorNetworks(Callback):
         #time = datetime.now().strftime('%m%d-%H%M%S')
         pass 
 
-    def _trigger(self):
+    def _after_run(self):
         try:   
             freeze_graph(self._sess, self._var_list)
             logger.info("Model saved to %s." % tf.train.get_checkpoint_state(self.saving_dir).model_checkpoint_path)
+
         except (OSError, IOError, tf.errors.PermissionDeniedError,
                 tf.errors.ResourceExhaustedError):   # disk error sometimes.. just ignore it
             logger.exception("Exception in ModelSaver!")
