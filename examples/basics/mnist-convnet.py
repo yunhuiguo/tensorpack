@@ -114,14 +114,12 @@ class Model(ModelDesc):
         tf.summary.scalar('lr', lr)
         return tf.train.AdamOptimizer(lr)
 
-
 def get_data():
     train = BatchData(dataset.Mnist('train'), 128)
     test = BatchData(dataset.Mnist('test'), 256, remainder=True)
     train = PrintData(train)
 
     return train, test
-
 
 def get_config():
     dataset_train, dataset_test = get_data()
@@ -134,9 +132,9 @@ def get_config():
         model= Model(),
         dataflow= dataset_train,  # the DataFlow instance for training
         callbacks=[
-            #ModelSaver(),   # save the model after every epoch
+            ModelSaver(),   # save the model after every epoch
             #MaxSaver('validation_accuracy'),  # save the model with highest accuracy (prefix 'validation_')
-            SaveSensorNetworks(["sensor1", "sensor2"]),
+            SaveSensorNetworks(["sensor1", "sensor2"], "Sensors"),
             InferenceRunner(    # run inference(for validation) after every epoch
                 dataset_test,   # the DataFlow instance used for validation
                 ScalarStats(['cross_entropy_loss', 'accuracy'])),

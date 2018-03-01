@@ -50,7 +50,6 @@ class SaveSensorNetworks(Callback):
         self.path = os.path.join(self.saving_dir, 'model')
 
     def _before_train(self):
-        # graph is finalized, OK to write it now.
         #time = datetime.now().strftime('%m%d-%H%M%S')
         self._sess = tf.get_default_session()
 
@@ -58,7 +57,7 @@ class SaveSensorNetworks(Callback):
         def freeze_graph(sess, var_list):
             for idx, var in enumerate(var_list):
                 frozen_graph_def = tf.graph_util.convert_variables_to_constants(sess, sess.graph_def, [var])
-                with tf.gfile.GFile(self.saving_dir + "_" + self._SensorsToSave[idx] + "_frozen.pb", "wb") as f:
+                with tf.gfile.GFile(os.path.join(self.saving_dir), self._SensorsToSave[idx] + "_frozen.pb", "wb") as f:
                     f.write(frozen_graph_def.SerializeToString())
         try:   
             freeze_graph(self._sess, self._var_list)
