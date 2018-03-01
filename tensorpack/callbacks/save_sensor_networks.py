@@ -2,6 +2,8 @@
 # File: save_sensor_networks.py
 
 import tensorflow as tf
+
+
 from datetime import datetime
 import os
 
@@ -18,7 +20,7 @@ def freeze_graph(sess, var_list):
     #    graph_def.ParseFromString(f.read())
 
     for var in var_list:
-        frozen_graph_def = convert_variables_to_constants(sess, sess.graph_def, [var])
+        frozen_graph_def = tf.graph_util.convert_variables_to_constants(sess, sess.graph_def, [var])
         with tf.gfile.GFile("./tmp/" + var + "frozen.pb", "wb") as f:
             f.write(frozen_graph_def.SerializeToString())
 
