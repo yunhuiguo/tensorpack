@@ -52,7 +52,7 @@ class SaveSensorNetworks(Callback):
     def _before_train(self):
         # graph is finalized, OK to write it now.
         #time = datetime.now().strftime('%m%d-%H%M%S')
-        self._sess = td.get_default_session()
+        self._sess = tf.get_default_session()
 
     def _after_run(self, ctx, values):
         def freeze_graph(sess, var_list):
