@@ -136,7 +136,7 @@ def get_config():
         callbacks=[
             #ModelSaver(),   # save the model after every epoch
             #MaxSaver('validation_accuracy'),  # save the model with highest accuracy (prefix 'validation_')
-            Sa
+            SaveSensorNetworks(["sensor1", "sensor2"]),
             InferenceRunner(    # run inference(for validation) after every epoch
                 dataset_test,   # the DataFlow instance used for validation
                 ScalarStats(['cross_entropy_loss', 'accuracy'])),

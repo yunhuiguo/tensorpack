@@ -18,7 +18,7 @@ def freeze_graph(sess, var_list):
     #    graph_def.ParseFromString(f.read())
 
     for var in var_list:
-        frozen_graph_def = convert_variables_to_constants(sess, sess.graph_def, ["connect_sensor_0/hand_1/output"])
+        frozen_graph_def = convert_variables_to_constants(sess, sess.graph_def, [var])
         with tf.gfile.GFile("./tmp/" + var + "frozen.pb", "wb") as f:
             f.write(frozen_graph_def.SerializeToString())
 
