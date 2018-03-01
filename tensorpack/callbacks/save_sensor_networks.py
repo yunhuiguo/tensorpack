@@ -8,7 +8,7 @@ import os
 from .base import Callback
 from ..utils import logger
 from ..tfutils.common import get_tf_version_number
-'''
+
 __all__ = ['SaveSensorNetworks']
 
 
@@ -42,7 +42,6 @@ for v in g.as_graph_def().node:
 saver = tf.train.Saver()
 
 
-
 class SaveSensorNetworks(Callback):
     """
     Save the model once triggered.
@@ -50,10 +49,9 @@ class SaveSensorNetworks(Callback):
 
     def __init__(self, SensorsToSave = [],
                 max_to_keep=10,
-                 keep_checkpoint_every_n_hours=0.5,
-                 checkpoint_dir=None,
-                 var_collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.MODEL_VARIABLES]):
-
+                keep_checkpoint_every_n_hours=0.5,
+                saving_dir=None,
+                ):
         """
         Args:
             max_to_keep (int): the same as in ``tf.train.Saver``.
@@ -66,14 +64,15 @@ class SaveSensorNetworks(Callback):
         self._max_to_keep = max_to_keep
         self._keep_every_n_hours = keep_checkpoint_every_n_hours
 
-        if not isinstance(var_collections, list):
-            var_collections = [var_collections]
-        self.var_collections = var_collections
+
+
         if checkpoint_dir is None:
             checkpoint_dir = logger.get_logger_dir()
+
         if checkpoint_dir is not None:
             if not tf.gfile.IsDirectory(checkpoint_dir):
                 tf.gfile.MakeDirs(checkpoint_dir)
+                
         self.checkpoint_dir = checkpoint_dir
 
     def _setup_graph(self):
@@ -100,7 +99,6 @@ class SaveSensorNetworks(Callback):
         # Scaffold will call saver.build from this collection
         tf.add_to_collection(tf.GraphKeys.SAVERS, self.saver)
 
-
     def _before_train(self):
         # graph is finalized, OK to write it now.
         time = datetime.now().strftime('%m%d-%H%M%S')
@@ -121,4 +119,3 @@ class SaveSensorNetworks(Callback):
         except (OSError, IOError, tf.errors.PermissionDeniedError,
                 tf.errors.ResourceExhaustedError):   # disk error sometimes.. just ignore it
             logger.exception("Exception in ModelSaver!")
-'''
