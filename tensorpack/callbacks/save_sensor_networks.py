@@ -10,17 +10,6 @@ from ..tfutils.common import get_tf_version_number
 
 __all__ = ['SaveSensorNetworks']
 
-def freeze_graph(sess, var_list):
-    # convert_variables_to_constants(sess, input_graph_def, output_node_names, variable_names_whitelist=None)
-    #with gfile.FastGFile("./tmp/" + "graph.pb", 'rb') as f:
-    #    graph_def = tf.GraphDef()
-    #    graph_def.ParseFromString(f.read())
-
-    for var in var_list:
-        frozen_graph_def = tf.graph_util.convert_variables_to_constants(sess, sess.graph_def, [var])
-        with tf.gfile.GFile("./tmp/" + var + "frozen.pb", "wb") as f:
-            f.write(frozen_graph_def.SerializeToString())
-
 class SaveSensorNetworks(Callback):
     """
     Save the model once triggered.
@@ -67,6 +56,15 @@ class SaveSensorNetworks(Callback):
         pass 
 
     def _after_run(self, ctx, values):
+        def freeze_graph(sess, var_list):
+            # convert_variables_to_constants(sess, input_graph_def, output_node_names, variable_names_whitelist=None)
+            #with gfile.FastGFile("./tmp/" + "graph.pb", 'rb') as f:
+            #    graph_def = tf.GraphDef()
+            #    graph_def.ParseFromString(f.read())
+            for var in var_list:
+                frozen_graph_def = tf.graph_util.convert_variables_to_constants(sess, sess.graph_def, [var])
+                with tf.gfile.GFile("./tmp/" + var + "frozen.pb", "wb") as f:
+                    f.write(frozen_graph_def.SerializeToString())
         try:   
             freeze_graph(self._sess, self._var_list)
             logger.info("Model saved to %s." % tf.train.get_checkpoint_state(self.saving_dir).model_checkpoint_path)
