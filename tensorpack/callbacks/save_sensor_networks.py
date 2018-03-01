@@ -66,7 +66,7 @@ class SaveSensorNetworks(Callback):
         #time = datetime.now().strftime('%m%d-%H%M%S')
         pass 
 
-    def _after_run(self):
+    def _after_run(self, ctx, values):
         try:   
             freeze_graph(self._sess, self._var_list)
             logger.info("Model saved to %s." % tf.train.get_checkpoint_state(self.saving_dir).model_checkpoint_path)
