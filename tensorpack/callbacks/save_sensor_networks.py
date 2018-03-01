@@ -40,9 +40,9 @@ class SaveSensorNetworks(Callback):
             var_collections (str or list of str): collection of the variables (or list of collections) to save.
         """
         self._sess = tf.get_default_session()
-        self._graph = tf.get_default_graph()
         self._prefix = "InferenceTower/"
         self._var_list = []
+        self._SensorsToSave = SensorsToSave
 
         if saving_dir is None:
             saving_dir = logger.get_logger_dir()
@@ -57,7 +57,7 @@ class SaveSensorNetworks(Callback):
         assert self.saving_dir is not None, \
             "ModelSaver() doesn't have a valid checkpoint directory."
 
-        for sensor in SensorsToSave:
+        for sensor in self._SensorsToSave:
             self._var_list.append(self._prefix + sensor + "_output")
 
         self.path = os.path.join(self.saving_dir, 'model')
