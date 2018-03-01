@@ -62,7 +62,7 @@ class SaveSensorNetworks(Callback):
             #    graph_def.ParseFromString(f.read())
             for idx, var in enumerate(var_list):
                 frozen_graph_def = tf.graph_util.convert_variables_to_constants(sess, sess.graph_def, [var])
-                with tf.gfile.GFile("./tmp/" + self._SensorsToSave[idx] + "frozen.pb", "wb") as f:
+                with tf.gfile.GFile(self.saving_dir + self._SensorsToSave[idx] + "_frozen.pb", "wb") as f:
                     f.write(frozen_graph_def.SerializeToString())
         try:   
             freeze_graph(self._sess, self._var_list)
