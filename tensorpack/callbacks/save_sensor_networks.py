@@ -27,7 +27,6 @@ class SaveSensorNetworks(Callback):
             saving_dir (str): Defaults to ``logger.get_logger_dir()``.
             var_collections (str or list of str): collection of the variables (or list of collections) to save.
         """
-        self._sess = tf.get_default_session()
         self._prefix = "InferenceTower/"
         self._var_list = []
         self._SensorsToSave = SensorsToSave
@@ -53,7 +52,7 @@ class SaveSensorNetworks(Callback):
     def _before_train(self):
         # graph is finalized, OK to write it now.
         #time = datetime.now().strftime('%m%d-%H%M%S')
-        pass 
+        self._sess = td.get_default_session()
 
     def _after_run(self, ctx, values):
         def freeze_graph(sess, var_list):
