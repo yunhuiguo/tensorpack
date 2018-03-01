@@ -56,34 +56,38 @@ class SaveSensorNetworks(Callback):
         Args:
             max_to_keep (int): the same as in ``tf.train.Saver``.
             keep_checkpoint_every_n_hours (float): the same as in ``tf.train.Saver``.
-            checkpoint_dir (str): Defaults to ``logger.get_logger_dir()``.
+            saving_dir (str): Defaults to ``logger.get_logger_dir()``.
             var_collections (str or list of str): collection of the variables (or list of collections) to save.
         """
+        self._sess = tf.get_default_session()
+        self._prefix = ""
 
+        
+
+        self.var_collections 
         
         self._max_to_keep = max_to_keep
         self._keep_every_n_hours = keep_checkpoint_every_n_hours
 
+        if saving_dir is None:
+            saving_dir = logger.get_logger_dir()
 
+        if saving_dir is not None:
+            if not tf.gfile.IsDirectory(saving_dir):
+                tf.gfile.MakeDirs(saving_dir)
 
-        if checkpoint_dir is None:
-            checkpoint_dir = logger.get_logger_dir()
-
-        if checkpoint_dir is not None:
-            if not tf.gfile.IsDirectory(checkpoint_dir):
-                tf.gfile.MakeDirs(checkpoint_dir)
-                
-        self.checkpoint_dir = checkpoint_dir
+        self.saving_dir = saving_dir
 
     def _setup_graph(self):
-        assert self.checkpoint_dir is not None, \
+        assert self.saving_dir is not None, \
             "ModelSaver() doesn't have a valid checkpoint directory."
         vars = []
         for key in self.var_collections:
             vars.extend(tf.get_collection(key))
         vars = list(set(vars))
-        self.path = os.path.join(self.checkpoint_dir, 'model')
+        self.path = os.path.join(self.saving_dir, 'model')
         if get_tf_version_number() <= 1.1:
+
             self.saver = tf.train.Saver(
                 var_list=vars,
                 max_to_keep=self._max_to_keep,
@@ -103,7 +107,7 @@ class SaveSensorNetworks(Callback):
         # graph is finalized, OK to write it now.
         time = datetime.now().strftime('%m%d-%H%M%S')
         self.saver.export_meta_graph(
-            os.path.join(self.checkpoint_dir,
+            os.path.join(self.saving_dir,
                          'graph-{}.meta'.format(time)),
             collection_list=self.graph.get_all_collection_keys())
 
@@ -115,7 +119,7 @@ class SaveSensorNetworks(Callback):
                 self.path,
                 global_step=tf.train.get_global_step(),
                 write_meta_graph=False)
-            logger.info("Model saved to %s." % tf.train.get_checkpoint_state(self.checkpoint_dir).model_checkpoint_path)
+            logger.info("Model saved to %s." % tf.train.get_checkpoint_state(self.saving_dir).model_checkpoint_path)
         except (OSError, IOError, tf.errors.PermissionDeniedError,
                 tf.errors.ResourceExhaustedError):   # disk error sometimes.. just ignore it
             logger.exception("Exception in ModelSaver!")
