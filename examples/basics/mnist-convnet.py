@@ -35,10 +35,10 @@ class Model(ModelDesc):
         Define all the inputs (with type, shape, name) that
         the graph will need.
         """
-        return [InputDesc(tf.float32, (None, IMAGE_SIZE), 'input1'),
-                InputDesc(tf.float32, (None, IMAGE_SIZE), 'input2'),
+        return [InputDesc(tf.float32, (None, IMAGE_SIZE), 'input_sensor_1'),
+                InputDesc(tf.float32, (None, IMAGE_SIZE), 'input_sensor_2'),
                 InputDesc(tf.int32, (None,), 'label')]
-
+                
     def _build_graph(self, inputs):
   
         """This function should build the model which takes the input variables
@@ -46,7 +46,8 @@ class Model(ModelDesc):
 
             # inputs contains a list of input variables defined above
         input_from_sensor1, input_from_sensor2, label = inputs
-     
+        print "ok"
+        print input_from_sensor1
             # In tensorflow, inputs to convolution function are assumed to be
             # NHWC. Add a single channel here.
             #image = tf.expand_dims(image, 3)
@@ -58,7 +59,6 @@ class Model(ModelDesc):
         sensor1 = Sequential('sensor1', input_from_sensor1) \
                 .FullyConnected('fc0', 512, activation=tf.nn.relu) \
                 .FullyConnected('fc1', 10, activation=tf.identity)() 
-
 
         print sensor1
 
@@ -72,9 +72,9 @@ class Model(ModelDesc):
 
         tf.nn.softmax(output, name='prob')   # a Bx10 with probabilities
 
-        g = tf.get_default_graph()
-        for v in g.as_graph_def().node:
-            print v.name
+        #g = tf.get_default_graph()
+        #for v in g.as_graph_def().node:
+        #    print v.name
 
         # a vector of length B with loss of each sample
         cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=output, labels=label)
@@ -134,7 +134,7 @@ def get_config():
         callbacks=[
             ModelSaver(),   # save the model after every epoch
             #MaxSaver('validation_accuracy'),  # save the model with highest accuracy (prefix 'validation_')
-            SaveSensorNetworks(["sensor1", "sensor2"], "Sensors"),
+            SaveSensorNetworks(["sensor1", "sensor2"], saving_dir = "sensors"),
             InferenceRunner(    # run inference(for validation) after every epoch
                 dataset_test,   # the DataFlow instance used for validation
                 ScalarStats(['cross_entropy_loss', 'accuracy'])),
