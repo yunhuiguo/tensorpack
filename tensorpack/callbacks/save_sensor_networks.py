@@ -66,7 +66,7 @@ class SaveSensorNetworks(Callback):
                     f.write(frozen_graph_def.SerializeToString())
         try:   
             freeze_graph(self._sess, self._var_list)
-            logger.info("Model saved to %s." % tf.train.get_checkpoint_state(self.saving_dir).model_checkpoint_path)
+            logger.info("Model saved to %s." % self.saving_dir)
 
         except (OSError, IOError, tf.errors.PermissionDeniedError,
                 tf.errors.ResourceExhaustedError):   # disk error sometimes.. just ignore it
