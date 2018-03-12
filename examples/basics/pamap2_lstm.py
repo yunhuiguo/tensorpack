@@ -17,20 +17,10 @@ from tensorpack import *
 from tensorpack.tfutils import summary
 from tensorpack.dataflow import dataset
 
-def batch_flatten(x):
-    """
-    Flatten the tensor except the first dimension.
-    """
-    shape = x.get_shape().as_list()[1:]
-    if None not in shape:
-        return tf.reshape(x, [-1, int(np.prod(shape))])
-    return tf.reshape(x, tf.stack([tf.shape(x)[0], -1]))
-
 def LSTM_Network(name, _X, n_steps, n_hidden, output_num, input_dim):
 
     _X = tf.transpose(_X, [1, 0, 2])  # permute n_steps and batch_size
     _X = tf.reshape(_X, [-1, input_dim])
-
 
     with tf.variable_scope(name):
         # Linear activation
@@ -38,8 +28,6 @@ def LSTM_Network(name, _X, n_steps, n_hidden, output_num, input_dim):
 
         # Split data because rnn cell needs a list of inputs for the RNN inner loop
         _X = tf.split(_X, n_steps, 0)
-        print _X[0].shape
-        print len(_X)
 
         lstm_cell_1 = tf.contrib.rnn.BasicLSTMCell(n_hidden, forget_bias=0.5, state_is_tuple=True)
         #lstm_cell_2 = tf.contrib.rnn.BasicLSTMCell(n_hidden, forget_bias=0.5, state_is_tuple=True)
