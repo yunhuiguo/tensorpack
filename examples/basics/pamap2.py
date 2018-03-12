@@ -54,26 +54,24 @@ class Model(ModelDesc):
 
 
 
-        sensor1 = Sequential(input_from_sensor1) 
-              .FullyConnected('fc0', 512, activation=tf.nn.relu) 
+        sensor1 = Sequential("sensor1", input_from_sensor1) \
+              .FullyConnected('fc0', 512, activation=tf.nn.relu) \
               .FullyConnected('fc1', 10, activation=tf.identity)()
 
 
-        sensor2 = Sequential(input_from_sensor2) 
-              .FullyConnected('fc2', 512, activation=tf.nn.relu) 
+        sensor2 = Sequential("sensor2", input_from_sensor2) \
+              .FullyConnected('fc2', 512, activation=tf.nn.relu) \
               .FullyConnected('fc3', 10, activation=tf.identity)()
 
 
-        sensor3 = Sequential(input_from_sensor3) 
-              .FullyConnected('fc4', 512, activation=tf.nn.relu) 
+        sensor3 = Sequential("sensor3", input_from_sensor3) \
+              .FullyConnected('fc4', 512, activation=tf.nn.relu) \
               .FullyConnected('fc5', 10, activation=tf.identity)()
 
 
-        output = Connect('cloud', [sensor1, sensors2, sensor3]) 
-                  .FullyConnected('fc6', 512, activation=tf.nn.relu) 
+        logits = Connect('cloud', [sensor1, sensor2, sensor3]) \
+                  .FullyConnected('fc6', 512, activation=tf.nn.relu) \
                   .FullyConnected('fc7', 10, activation=tf.identity)()
-
-
 
 
         tf.nn.softmax(logits, name='prob')   # a Bx10 with probabilities
@@ -97,6 +95,7 @@ class Model(ModelDesc):
         wd_cost = tf.multiply(1e-5,
                               regularize_cost('fc.*/W', tf.nn.l2_loss),
                               name='regularize_loss')
+
         self.cost = tf.add_n([wd_cost, cost], name='total_cost')
         summary.add_moving_summary(cost, wd_cost, self.cost)
 
@@ -104,6 +103,7 @@ class Model(ModelDesc):
         summary.add_param_summary(('.*/W', ['histogram', 'rms']))
 
     def _get_optimizer(self):
+        '''
         lr = tf.train.exponential_decay(
             learning_rate=1e-3,
             global_step=get_global_step_var(),
@@ -111,6 +111,9 @@ class Model(ModelDesc):
             decay_rate=0.3, staircase=True, name='learning_rate')
         # This will also put the summary in tensorboard, stat.json and print in terminal
         # but this time without moving average
+        '''
+        lr = 1e-3
+
         tf.summary.scalar('lr', lr)
         return tf.train.AdamOptimizer(lr)
 
@@ -252,13 +255,14 @@ def get_config(train_d, test_d):
         dataflow= dataset_train,  # the DataFlow instance for training
         callbacks=[
             ModelSaver(),   # save the model after every epoch
-            MaxSaver('validation_accuracy'),  # save the model with highest accuracy (prefix 'validation_')
+            #MaxSaver('validation_accuracy'),  # save the model with highest accuracy (prefix 'validation_')
+            SaveSensorNetworks(["sensor1", "sensor2", "sensor3"], saving_dir = "sensors"),
             InferenceRunner(    # run inference(for validation) after every epoch
                 dataset_test,   # the DataFlow instance used for validation
                 ScalarStats(['cross_entropy_loss', 'accuracy'])),
         ],
         steps_per_epoch=steps_per_epoch,
-        max_epoch=1,
+        max_epoch=5,
     )
 
 
