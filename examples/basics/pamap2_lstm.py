@@ -17,6 +17,7 @@ from tensorpack import *
 from tensorpack.tfutils import summary
 from tensorpack.dataflow import dataset
 
+
 def LSTM_Network(name, _X, n_steps, n_hidden, output_num, input_dim):
 
     _X = tf.transpose(_X, [1, 0, 2])  # permute n_steps and batch_size
