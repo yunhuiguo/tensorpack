@@ -32,8 +32,8 @@ def LSTM_Network(name, _X, n_steps, n_hidden, output_num, input_dim):
 
         lstm_cell_1 = tf.contrib.rnn.BasicLSTMCell(n_hidden, forget_bias=0.5, state_is_tuple=True)
         #lstm_cell_2 = tf.contrib.rnn.BasicLSTMCell(n_hidden, forget_bias=0.5, state_is_tuple=True)
-        # lstm_cell_3 = tf.contrib.rnn.BasicLSTMCell(config.n_hidden, forget_bias=0.5, state_is_tuple=True)
-        # lstm_cells = tf.contrib.rnn.MultiRNNCell([lstm_cell_1, lstm_cell_2,lstm_cell_3], state_is_tuple=True)
+        #lstm_cell_3 = tf.contrib.rnn.BasicLSTMCell(config.n_hidden, forget_bias=0.5, state_is_tuple=True)
+        #lstm_cells = tf.contrib.rnn.MultiRNNCell([lstm_cell_1, lstm_cell_2,lstm_cell_3], state_is_tuple=True)
         lstm_cells = tf.contrib.rnn.MultiRNNCell([lstm_cell_1], state_is_tuple=True)
         # Get LSTM cell output
         outputs, states = tf.contrib.rnn.static_rnn(lstm_cells, _X, dtype=tf.float32)
@@ -169,7 +169,7 @@ class MyDataFlow(RNGDataFlow):
             i_segment = 0
             i_label = 0
 
-            for (start,end) in windowz(x_train,window_size):
+            for (start,end) in windowz(x_train, window_size):
 
                 if(len(x_train[start:end]) == window_size):
 
@@ -178,6 +178,7 @@ class MyDataFlow(RNGDataFlow):
                     labels[i_label] = m[0]
                     i_label+=1
                     i_segment+=1
+
             return segments, labels
 
 
@@ -193,7 +194,7 @@ class MyDataFlow(RNGDataFlow):
             labels = []
             for i, filename in enumerate(filelist):
                 print('Reading file %d of %d' % (i+1, len(filelist)))
-                with open('/home/henry/Desktop/Deep-Learning-for-Human-Activity-Recognition/PAMAP2_Dataset/Protocol/' + filename, 'r') as f:
+                with open('/Users/henry/Desktop/projects/tensorpack/examples/basics/PAMAP2_Dataset/Protocol/' + filename, 'r') as f:
                     #print "f",f
                     df = pd.read_csv(f, delimiter=' ',  header = None)
                     df = df.dropna()
@@ -244,7 +245,6 @@ class MyDataFlow(RNGDataFlow):
             hand = img[:,1:18].reshape((-1,17))
             chest = img[:,18:35].reshape((-1,17))
             ankle = img[:,35:].reshape((-1,17))
-        
             label = self.labels[k]
 
             yield [heart, hand, chest, ankle, label]
