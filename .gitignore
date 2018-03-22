@@ -14,7 +14,6 @@ tensorpack/user_ops/obj
 checkpoint
 *.json
 *.prototxt
-*.txt
 *.tgz
 *.gz
 
