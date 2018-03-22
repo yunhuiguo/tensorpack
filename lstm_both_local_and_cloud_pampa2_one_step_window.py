@@ -1,11 +1,11 @@
 #!/usr/bin/python 
 
 import os
-os.environ["CUDA_VISIBLE_DEVICES"]="-1"
+#os.environ["CUDA_VISIBLE_DEVICES"]="-1"
 
 import sys
 sys.path.append('../')
-import Hierarchical_Neural_Networks as HNN
+#import Hierarchical_Neural_Networks as HNN
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -20,7 +20,7 @@ def LSTM_Network(name, _X, n_steps, n_hidden, output_num, input_dim):
     _X = tf.reshape(_X, [-1, input_dim])
 
     with tf.variable_scope(name):
-        _X = tf.split(_X, n_steps, 0)
+        _X = tf.split(_X, n_steps, 0) 
         lstm_cell_1 = tf.contrib.rnn.BasicLSTMCell(n_hidden, forget_bias=0.5, state_is_tuple=True)
         lstm_cells = tf.contrib.rnn.MultiRNNCell([lstm_cell_1], state_is_tuple=True)
         outputs, states = tf.contrib.rnn.static_rnn(lstm_cells, _X, dtype=tf.float32)   
@@ -29,8 +29,8 @@ def LSTM_Network(name, _X, n_steps, n_hidden, output_num, input_dim):
 
         W = tf.Variable(tf.random_normal([n_hidden, output_num]))
         b = tf.Variable(tf.random_normal([output_num]))
-
-    return tf.matmul(lstm_last_output, W) + b
+        output =  tf.matmul(lstm_last_output, W) + b
+    return output
 
 def main(subject, train_data, one_hot_train_labels, \
                             test_data, one_hot_test_labels, \
@@ -41,54 +41,25 @@ def main(subject, train_data, one_hot_train_labels, \
 
     tf.reset_default_graph()    
 
-
-    def windowz(data, step):
-        start = 0
-        while start < len(data):
-            yield start, start + step
-            start += step
-
-    def segment_pa2(x_train,y_train,window_size):
-        segments = np.zeros(((len(x_train)//(window_size//2))-1, window_size, 52))
-        labels = np.zeros(((len(y_train)//(window_size//2))-1))
-
-        i_segment = 0
-        i_label = 0
-
-        for (start,end) in windowz(x_train,window_size):
-          if(len(x_train[start:end]) == window_size):
-
-            m = stats.mode(y_train[start:end])
-
-            segments[i_segment] = x_train[start:end]
-            labels[i_label] = m[0]
-
-            i_label+=1
-            i_segment+=1
-
-        return segments, labels
-
     with tf.name_scope('input'):
         x = tf.placeholder(tf.float32, [None, 25, 52])
-        y_ = tf.placeholder(tf.int64, [None, 25, 1])
+        y_ = tf.placeholder(tf.int64, [None,])
         keep_prob = tf.placeholder(tf.float32)
 
     n_hidden = 64 
     n_classes = 5
     n_steps = 25
-
-    step = 1
+    batch_size  = 25
 
     heart_output = []
     hand_output = []
     chest_output = []
     ankle_output = []
 
+    i_segment = 0
+    i_label = 0
 
-
-
-
-
+    outputs = []
 
     heart_input = tf.reshape(x[:,:,0], [-1,25,1])
     heart = LSTM_Network('sensor1', heart_input, n_steps, n_hidden, output_num, 1)
@@ -96,31 +67,29 @@ def main(subject, train_data, one_hot_train_labels, \
     chest = LSTM_Network('sensor3', x[:,:,18:35], n_steps, n_hidden, output_num, 17)
     ankle = LSTM_Network('sensor4', x[:,:,35:], n_steps, n_hidden, output_num, 17)
 
-    outputs = []    
     for step in range(n_steps):
         local_output = []
         local_output.append(heart[step])
         local_output.append(hand[step])
         local_output.append(chest[step])
         local_output.append(ankle[step])
-        outputs.append(tf.concat(local_output, axis = 1))
+        outputs.append(local_output)
+
+    i_segment += 1
+    i_label += 1
 
     outputs = tf.convert_to_tensor(outputs)
-    print outputs
+    outputs = tf.transpose(outputs, [2, 0, 1])  # permute n_steps and batch_size 
+    output = LSTM_Network('cloud', outputs, n_steps, n_hidden, n_classes, 4*output_num)
+    print "output"
+    print output
 
-    outputs = tf.transpose(outputs, [1, 0, 2])  # permute n_steps and batch_size 
-
-    all_output = LSTM_Network('cloud', outputs, n_steps, n_hidden, n_classes, 4*output_num)
-
-    all_output = tf.convert_to_tensor(all_output)
-
-    batch_size = 256
+    batch_size = 25
     training_epochs = 150
-    output = tf.reshape(all_output, [-1, 5])
     
     with tf.name_scope('cross_entropy'):
-        cross_entropy = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = tf.reshape(y_, [-1,]),
-                                                                logits = output))   
+        cross_entropy = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = [y_[-1]],
+                                                                logits = output))
         #l2_loss = HNN.gather_l2_loss(tf.get_default_graph())
         #l2_loss = tf.reduce_sum(tf.stack(l2_loss))
         total_loss = cross_entropy  #+ l2_regularizer * l2_loss
@@ -129,16 +98,17 @@ def main(subject, train_data, one_hot_train_labels, \
         train_step = tf.train.AdamOptimizer(learning_rate).minimize(total_loss)
 
     with tf.name_scope('accuracy'):
-        correct_prediction = tf.equal(tf.argmax(output, 1), tf.reshape(y_, [-1,]))
+        correct_prediction = tf.equal(tf.argmax(output, 1), [y_[-1]])
         correct_prediction = tf.cast(correct_prediction, tf.float32)
         accuracy = tf.reduce_mean(correct_prediction)
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         # create a summary for our cost and accuracy
-        tf.summary.scalar("cost", cross_entropy)
-        tf.summary.scalar("accuracy", accuracy)
-        batch_count = train_data.shape[0] / batch_size
+        #tf.summary.scalar("cost", cross_entropy)
+        #tf.summary.scalar("accuracy", accuracy)
+
+        #batch_count = train_data.shape[0] / batch_size
 
         validation_loss_last_epoch = None
         last_test_accuracy = None
@@ -153,62 +123,69 @@ def main(subject, train_data, one_hot_train_labels, \
             X_random = train_data
             Y_random = one_hot_train_labels
 
-            loss = 0.0
-            mean_acc = 0.0
+            #acc, train_loss = sess.run((accuracy, total_loss),
+            #        feed_dict={x: X_random, y_: Y_random, keep_prob: 1.0})
+            #print train_loss
+        
+            for i in range(train_data.shape[0] - batch_size):
+                train_data_batch = X_random[i: i + batch_size, :,:]
+
+                train_label_batch = Y_random[i : i+batch_size]
+                _, loss_, acc = sess.run([train_step, total_loss, accuracy], feed_dict={x: train_data_batch, y_: train_label_batch, keep_prob: keepprob})
+
+                if i % 1000 == 0:
+                    print "evaluating test"
+                    acc_ = []
+                    for i in range(test_data.shape[0] - batch_size):
+                        test_data_batch = test_data[i: i + batch_size, :,:]
+                        test_label_batch = test_labels[i : i+batch_size]
+                        loss_, acc = sess.run([total_loss, accuracy], feed_dict={x: test_data_batch, y_: test_label_batch, keep_prob: keepprob})
+                        acc_.append(acc)
+                    print sum(acc_) / (len(acc_) + 0.0)
+              
+
+            #acc, train_loss = sess.run((accuracy, total_loss),
+            #        feed_dict={x: train_data_batch, y_: train_label_batch, keep_prob: 1.0})
             
-            acc, train_loss = sess.run((accuracy, total_loss),
-                    feed_dict={x: X_random, y_: Y_random, keep_prob: 1.0})
-            print train_loss
-            
+            '''
+            print one_hot_validation_labels.shape
+            one_hot_validation_labels = one_hot_validation_labels.reshape((-1, ))
+            val_loss = sess.run((total_loss),
+                    feed_dict={x: validation_data, y_: one_hot_validation_labels, keep_prob: 1.0})
 
-            for i in range(batch_count):
-                train_data_batch = X_random[i * batch_size: (i+1) * batch_size, :,:]
-                train_label_batch = Y_random[i * batch_size: (i+1) * batch_size, :,:]
-                _ = sess.run([train_step], feed_dict={x: train_data_batch, y_: train_label_batch, keep_prob: keepprob})
-    
-                acc, train_loss = sess.run((accuracy, total_loss),
-                        feed_dict={x: train_data_batch, y_: train_label_batch, keep_prob: 1.0})
-                
+            if validation_loss_last_epoch == None:
+                validation_loss_last_epoch = val_loss
 
-                '''
-                print one_hot_validation_labels.shape
-                one_hot_validation_labels = one_hot_validation_labels.reshape((-1, ))
-                val_loss = sess.run((total_loss),
-                        feed_dict={x: validation_data, y_: one_hot_validation_labels, keep_prob: 1.0})
+            one_hot_test_labels = one_hot_test_labels.reshape((-1,))
+                test_accuracy, test_loss = sess.run((accuracy, total_loss),
+                    feed_dict={x: test_data, y_: one_hot_test_labels, keep_prob: 1.0})
 
-                if validation_loss_last_epoch == None:
+                if last_test_accuracy == None:
+                    last_test_accuracy = test_accuracy
+
+            else:
+                if val_loss < validation_loss_last_epoch:
+                    cnt = 5
+
                     validation_loss_last_epoch = val_loss
-
-                one_hot_test_labels = one_hot_test_labels.reshape((-1,))
                     test_accuracy, test_loss = sess.run((accuracy, total_loss),
                         feed_dict={x: test_data, y_: one_hot_test_labels, keep_prob: 1.0})
 
-                    if last_test_accuracy == None:
+                    if last_test_accuracy < test_accuracy:
+                        last_test_accuracy = test_accuracy
+                else:
+                    cnt = cnt - 1
+
+                    validation_loss_last_epoch = val_loss
+
+                    test_accuracy, test_loss = sess.run((accuracy, total_loss),
+                        feed_dict={x: test_data, y_: one_hot_test_labels, keep_prob: 1.0})
+
+                    if last_test_accuracy < test_accuracy:
                         last_test_accuracy = test_accuracy
 
-                else:
-                    if val_loss < validation_loss_last_epoch:
-                        cnt = 5
-
-                        validation_loss_last_epoch = val_loss
-                        test_accuracy, test_loss = sess.run((accuracy, total_loss),
-                            feed_dict={x: test_data, y_: one_hot_test_labels, keep_prob: 1.0})
-
-                        if last_test_accuracy < test_accuracy:
-                            last_test_accuracy = test_accuracy
-                    else:
-                        cnt = cnt - 1
-
-                        validation_loss_last_epoch = val_loss
-
-                        test_accuracy, test_loss = sess.run((accuracy, total_loss),
-                            feed_dict={x: test_data, y_: one_hot_test_labels, keep_prob: 1.0})
-
-                        if last_test_accuracy < test_accuracy:
-                            last_test_accuracy = test_accuracy
-
-                        if cnt == 0:
-                            break
+                    if cnt == 0:
+                        break
 
                 f = open("./summary_both_local_and_cloud_lstm.txt", "a+")
                 if subject == 6:
@@ -265,7 +242,6 @@ class MyDataFlow():
     def get_data(self):
         return self.images, self.labels
 
-
 if __name__ == '__main__':
 
     dataflow = MyDataFlow()
@@ -283,14 +259,7 @@ if __name__ == '__main__':
     def windowz(data, step):
         start = 0
         while start < len(data):
-            yield start, start + step
-            start += step
-
-    def windowz_one_step(data, step):
-        start = 0
-        while start < data.shape[0]:
-
-            yield start, start + step
+            yield start, start + 25
             start += step
 
     def segment_pa2(x_train,y_train,window_size):
@@ -298,51 +267,30 @@ if __name__ == '__main__':
 
         labels = np.zeros((len(x_train) - window_size + step))
 
-        print segments.shape
-        print labels.shape
-
         i_segment = 0
         i_label = 0
 
         for (start, end) in windowz(x_train, 1):
             if(len(x_train[start:end]) == window_size):
-
                 segments[i_segment] = x_train[start:end]
-                labels[i_label] = y_train[end]
+                labels[i_label] = y_train[end-1][0]
                 i_label+=1
                 i_segment+=1
 
-        segments_one_step  = np.zeros(( segments.shape[0]-1, window_size, window_size, 52))
-        labels_one_step =  np.zeros(( labels.shape[0]-1))
-
-        i_segment = 0
-        i_label = 0
-
-        for (start, end) in windowz_one_step(segments, 1):
-            if(len(segments[start:end]) == window_size):
-                segments_one_step[i_segment] = segments[start:end]
-                labels_one_step[i_label] = labels[start]
-
-                i_segment += 1
-                i_label += 1
-
-        print segments_one_step.shape
-        print labels_one_step.shape
-
-        return segments_one_step, labels_one_step
-
+        return segments, labels
 
     l2_regularizers = [0.01, 0.1, 1]
     keep_probs = [0.5]
     learning_rates = [0.001, 0.01, 0.1]
-    output_nums = [10]
+    output_nums = [1]
 
+    '''
     train_data = np.concatenate(data_list)
     train_labels = np.concatenate(label_list)
     train_labels =  train_labels.reshape(train_labels.shape[0],1)
     train_data, train_labels = segment_pa2( train_data, train_labels, input_width)
-    
     '''
+    
     for learning_rate in learning_rates:
         for l2 in l2_regularizers:
             for keep_prob in keep_probs:
@@ -361,17 +309,17 @@ if __name__ == '__main__':
 
                     valiation_time = 7
                     for i in range(valiation_time):
-                        
+                    
                         test_data = data_list[i]
                         test_labels = label_list[i]
-
+                        
                         valiation_idx = random.randint(0, valiation_time-1)
                         while valiation_idx == i:
                              valiation_idx = random.randint(0, valiation_time-1)
-
+                        
                         validation_data = data_list[valiation_idx]
                         validation_labels = label_list[valiation_idx]
-
+                        
                         train_data_list = data_list[:]
                         train_label_list = label_list[:]
 
@@ -383,21 +331,27 @@ if __name__ == '__main__':
 
                         train_data = np.concatenate(train_data_list)
                         train_labels = np.concatenate(train_label_list)
-
-
+                        '''
+                        train_data = test_data
+                        validation_data = test_data
+                        validation_labels = test_labels
+                        train_labels = test_labels
+                        '''
                         train_labels =  train_labels.reshape(train_labels.shape[0],1)
                         validation_labels = validation_labels.reshape(validation_labels.shape[0],1)
                         test_labels = test_labels.reshape(test_labels.shape[0],1)
+                     
 
                         train_data, train_labels = segment_pa2( train_data,train_labels, input_width)
                         test_data, test_labels = segment_pa2(test_data,test_labels, input_width)
                         validation_data, validation_labels = segment_pa2(validation_data, validation_labels, input_width)
 
-              
                         train_labels = train_labels.astype(int)
                         test_labels = test_labels.astype(int)
                         validation_labels = validation_labels.astype(int)
-                 
+                        
+                        print train_labels
+
                         main(i, train_data, train_labels, \
                             test_data, test_labels, \
                             validation_data, validation_labels, \
@@ -405,5 +359,5 @@ if __name__ == '__main__':
                             keep_prob, \
                             learning_rate, output_num)
                           
-    '''
+    
         
