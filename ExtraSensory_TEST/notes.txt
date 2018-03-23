@@ -1,0 +1,12 @@
+extra_sensors_datasets:
+
+sensors_to_use = ['Acc','Gyro', 'WAcc', 'Loc', 'Aud', 'PS'];
+
+
+train: (1509384, 51)
+test: (3108, 51)
+
+#################################################################
+fully_connected:
+
+
