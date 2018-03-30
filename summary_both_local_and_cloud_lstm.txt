@@ -1,2 +1,0 @@
-l2 = 0.01 keep_prob = 0.5 learning rate = 0.001 output_num = 10
-[
