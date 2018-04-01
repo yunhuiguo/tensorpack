@@ -153,14 +153,14 @@ def main(subject, train_data, one_hot_train_labels, \
 if __name__ == '__main__':
     sensors = ['hand', 'chest', 'ankle']
 
-    train_path1 = '/home/henry/Desktop/Hirarchical_ML/iot/code/PAMAP2_parser/ext_features/subject101_ext_features/'
-    train_path2 = '/home/henry/Desktop/Hirarchical_ML/iot/code/PAMAP2_parser/ext_features/subject102_ext_features/'
+    train_path1 = '/root/PAMPA2/exp/ext_features/subject101_ext_features/'
+    train_path2 = '/root/PAMPA2/exp/ext_features/subject102_ext_features/'
     #train_path3 = '/Users/henry/Desktop/ucsd/seelab/Hirarchical_ML/iot/code/PAMAP2_parser/subject103_ext_features/'
-    train_path4 = '/home/henry/Desktop/Hirarchical_ML/iot/code/PAMAP2_parser/ext_features/subject104_ext_features/'
-    train_path5 = '/home/henry/Desktop/Hirarchical_ML/iot/code/PAMAP2_parser/ext_features/subject105_ext_features/'
-    train_path6 = '/home/henry/Desktop/Hirarchical_ML/iot/code/PAMAP2_parser/ext_features/subject106_ext_features/'
-    train_path7 = '/home/henry/Desktop/Hirarchical_ML/iot/code/PAMAP2_parser/ext_features/subject107_ext_features/'
-    train_path8 = '/home/henry/Desktop/Hirarchical_ML/iot/code/PAMAP2_parser/ext_features/subject108_ext_features/'
+    train_path4 = '/root/PAMPA2/exp/ext_features/subject104_ext_features/'
+    train_path5 = '/root/PAMPA2/exp/ext_features/subject105_ext_features/'
+    train_path6 = '/root/PAMPA2/exp/ext_features/subject106_ext_features/'
+    train_path7 = '/root/PAMPA2/exp/ext_features/subject107_ext_features/'
+    train_path8 = '/root/PAMPA2/exp/ext_features/subject108_ext_features/'
 
 
     train_data1, train_labels1 = read_data(train_path1, sensors)
@@ -289,8 +289,8 @@ if __name__ == '__main__':
                 #print sum(accuracy)/(len(accuracy) + 0.0)
     '''
 
+    l1_regularizers = [0.5, 1]
     l2_regularizers = [0.0, 0.005, 0.05, 0.1, 0.5, 1]
-    l1_regularizers = [0.0, 0.005, 0.05, 0.1, 0.5, 1]
 
     for l1 in l1_regularizers:
         for l2 in l2_regularizers:
